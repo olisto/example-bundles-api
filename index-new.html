@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <!--
+        Customize this policy to fit your own app's needs. For more guidance, see:
+            https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
+        Some notes:
+            * gap: is required only on iOS (when using UIWebView) and is needed for JS->native communication
+            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
+            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
+                * Enable inline JS: add 'unsafe-inline' to default-src
+        -->
+        <meta name="format-detection" content="telephone=no">
+        <meta name="msapplication-tap-highlight" content="no">
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <title>Olisto SDK Example</title>
+    </head>
+    <body>
+        <div class="app">
+            <h1>Apache Cordova</h1>
+            <div id="deviceready" class="blink">
+                <p class="event listening">Connecting to Device</p>
+                <p class="event received">Device is Ready</p>
+            </div>
+        </div>
+
+        <script type="text/javascript" src="cordova.js"></script>
+        <script type="module" src="../js/index.js"></script>
+        <script src="../js/olisto-sdk.js"></script>
+
+        <script type="module">
+			const partnerKey = '7ze1d587238s7524f73k3333';
+			const appId = 'test.app.id';
+			const userId = 'userId0981238763425';
+			const channelId = 'eneco-toon';
+
+			const bundleToInstantiate = {
+				bundleId: '5dfb9f675f4cf381a8f4bf9c',
+				name: 'test_SDK',
+				wizardOutput:
+					[
+						[
+							'5c541927962d7b5cb63ee598',
+							{
+								endpoint: 'geofencing.5c545fe2468bc962fc28aacc',
+								_id: '5c545fe2468bc962fc28aacc',
+							},
+						],
+						[
+							[
+								{
+									endpoint: 'tplink.80121B61A8C743DBFB6142DE6D1B926B1B6763E5',
+									_id: '5d6ce03e5596f54f5a6391ec',
+								},
+							],
+						],
+					],
+			};
+
+			const api = olisto.OlistoApi.init(partnerKey, appId, userId);
+
+			api._getUserContext(userId, () => {
+				api.getBundlesTemplate().then(data => {
+					console.log(data);
+					console.log('-----------------');
+				});
+
+				api.instantiateBundle(bundleToInstantiate).then(data => {
+					console.log(data);
+				});
+            });
+
+			function handleError(error) {
+				console.log(error.toString());
+				console.log(JSON.stringify(error));
+			}
+        </script>
+    </body>
+</html>
