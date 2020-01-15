@@ -1,0 +1,13 @@
+{
+  "name": "@triggi/app-sdk-example",
+  "version": "0.1.0",
+  "description": "An example for the Olisto SDK",
+  "main": "index.html",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Tom Zoon - tom.zoon@olisto.com",
+  "dependencies": {
+    "olisto-js-sdk": "git+https://github.com/olisto/olisto-js-sdk.git"
+  }
+}
