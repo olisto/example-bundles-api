@@ -20,9 +20,10 @@
 
 		<p id="BundleInstantiation">Instantiating new bundle:</br></p>
 
-		<p id="bundleRetrievalUserTwo">Retrieving bundles again (activated on this user account):</br></p>
+		<p id="bundleRetrievalUserTwo">Retrieving bundles again (Did the bundle get added?):</br></p>
 
 		<span>Connect channel (Eneco Toon)</br><button onclick="connectChannel()">Connect</button></span>
+		<p id="channelConnected"></p>
 	</body>
 
 	<script type="module">
@@ -105,8 +106,9 @@
 		window.connectChannel = function connectChannel() {
 			api.openInitChannel(channelId, function (data) {
 				console.log(data.channel + ' channel is ' + data.status);
+				$('#channelConnected').append("<b>" + data.channel + " channel is " + data.status + "</b></br>");
 			});
-		}
+		};
 
 		function handleError(error) {
 			console.log(error.toString());
