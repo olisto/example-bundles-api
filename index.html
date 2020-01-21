@@ -8,11 +8,21 @@
 		<meta name="description" content="An example for the Olisto SDK">
 		<meta name="author" content="SitePoint">
 
+		<script src="node_modules/jquery/dist/jquery.js"></script>
 		<script src="lib/olisto-sdk.js"></script>
 	</head>
 
 	<body>
+		<h1>SDK example</h1>
+		<p id="bundleRetrievalPartner">Retrieving bundles (supplied by the partner):</br></p>
 
+		<p id="bundleRetrievalUser">Retrieving bundles (activated on this user account):</br></p>
+
+		<p id="BundleInstantiation">Instantiating new bundle:</br></p>
+
+		<p id="bundleRetrievalUserTwo">Retrieving bundles again (activated on this user account):</br></p>
+
+		<span>Connect channel (Eneco Toon)</br><button onclick="connectChannel()">Connect</button></span>
 	</body>
 
 	<script type="module">
@@ -47,15 +57,56 @@
 		const api = olisto.OlistoApi.init(partnerKey, appId, userId);
 
 		api._getUserContext(userId, () => {
-			api.getBundlesTemplate().then(data => {
-				console.log(data);
-				console.log('-----------------');
+			// Get bundles created from the partner
+			api.getBundlesTemplate().then(bundles => {
+				$('#bundleRetrievalPartner').append("<b>" + bundles.length + " bundles retrieved</b></br>");
+
+				console.log("Bundles supplied by the partner:");
+				console.log(bundles);
+				console.log("---");
 			});
 
-			api.instantiateBundle(bundleToInstantiate).then(data => {
-				console.log(data);
-			});
+			// Get bundles from this user
+			setTimeout(function() {
+				api.getUserBundles().then(bundles => {
+					$('#bundleRetrievalUser').append("<b>" + bundles.length + " bundles retrieved</b></br>");
+
+					console.log("Bundles on the users account:");
+					console.log(bundles);
+					console.log("---");
+				}).catch(handleError);
+			}, 250);
+
+			// Instantiate a new bundle
+			setTimeout(function() {
+				api.instantiateBundle(bundleToInstantiate).then(data => {
+					$('#BundleInstantiation').append("<b>Bundle instantiated: " + data.name + "</b></br>");
+
+					console.log("Instantiating bundle with request data:");
+					console.log(bundleToInstantiate);
+					console.log("Server returned:");
+					console.log(data);
+					console.log("---");
+				});
+			}, 500);
+
+			// Get bundles from this user
+			setTimeout(function() {
+				api.getUserBundles().then(bundles => {
+					$('#bundleRetrievalUserTwo').append("<b>" + bundles.length + " bundles retrieved</b></br>");
+
+					console.log("Bundles on the users account:");
+					console.log(bundles);
+					console.log("---");
+				}).catch(handleError);
+			}, 750);
 		});
+
+		window.connectChannel = function connectChannel() {
+			api.openInitChannel(channelId, function (data) {
+				console.log(data.channel + ' channel is ' + data.status);
+			});
+		}
 
 		function handleError(error) {
 			console.log(error.toString());

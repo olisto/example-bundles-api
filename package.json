@@ -8,6 +8,7 @@
   },
   "author": "Tom Zoon - tom.zoon@olisto.com",
   "dependencies": {
+    "jquery": "^3.4.1",
     "olisto-js-sdk": "git+https://github.com/olisto/olisto-js-sdk.git"
   }
 }
