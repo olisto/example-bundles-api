@@ -33,7 +33,9 @@
 
 		<p id="BundleInstantiation">Instantiating new bundle:<br/></p>
 
-		<span>Connect channel (Eneco Toon)<br/><button onclick="connectChannel()">Connect</button></span>
+		<span>Connect Eneco Toon<br/><button value="eneco-toon" onclick="connectChannel()">Connect</button></span>
+		<span>Connect Philips Hue<br/><button value="philips-hue" onclick="connectChannel()">Connect</button></span>
+
 		<p id="channelConnected"></p>
 	</body>
 
@@ -41,7 +43,6 @@
 		const partnerKey = '7ze1d587238s7524f73k3333';
 		const appId = 'test.app.id';
 		const userId = 'userId0981238763425';
-		const channelId = 'eneco-toon';
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
@@ -136,6 +137,8 @@
 		window.addBundle = function addBundle() {
 			console.log(event.srcElement.value);
 			console.log(partnerBundles);
+
+			// partnerBundles[0].
 		};
 
 		window.removeBundle = function removeBundle() {
@@ -144,6 +147,8 @@
 		};
 
 		window.connectChannel = function connectChannel() {
+			console.log(event.srcElement.value);
+			return;
 			api.openInitChannel(channelId, function (data) {
 				console.log(data.channel + ' channel is ' + data.status);
 				$('#channelConnected').append("<b>" + data.channel + " channel is " + data.status + "</b></br>");
