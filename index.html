@@ -14,9 +14,12 @@
 
 	<body>
 		<h1>SDK example</h1>
-		<p id="bundleRetrievalPartner">Retrieving bundles (supplied by the partner):</br></p>
+		<p>Retrieving bundles (supplied by the partner):<br/><br/>
+			<span id="bundleRetrievalPartner"></span>
+			<br/>
+		</p>
 
-		<p id="bundleRetrievalUser">Retrieving bundles (activated on this user account):</br></p>
+		<p id="bundleRetrievalUser">Retrieving bundles (activated on this user account):<br/></p>
 
 		<p id="BundleInstantiation">Instantiating new bundle:</br></p>
 
@@ -35,66 +38,68 @@
 		const bundleToInstantiate = {
 			bundleId: '5dfb9f675f4cf381a8f4bf9c',
 			name: 'test_SDK',
-			wizardOutput:
+			wizardOutput: [
+				[
+					'5c541927962d7b5cb63ee598',
+					{
+						endpoint: 'geofencing.5c545fe2468bc962fc28aacc',
+						_id: '5c545fe2468bc962fc28aacc',
+					},
+				],
 				[
 					[
-						'5c541927962d7b5cb63ee598',
 						{
-							endpoint: 'geofencing.5c545fe2468bc962fc28aacc',
-							_id: '5c545fe2468bc962fc28aacc',
+							endpoint: 'tplink.80121B61A8C743DBFB6142DE6D1B926B1B6763E5',
+							_id: '5d6ce03e5596f54f5a6391ec',
 						},
 					],
-					[
-						[
-							{
-								endpoint: 'tplink.80121B61A8C743DBFB6142DE6D1B926B1B6763E5',
-								_id: '5d6ce03e5596f54f5a6391ec',
-							},
-						],
-					],
 				],
+			],
 		};
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
 		api.getUserContext(userId).then(() => {
-			// Get bundles created from the partner
 			return api.getBundlesTemplate();
-		}).then((bundles) => {
-			$('#bundleRetrievalPartner').append("<b>" + bundles.length + " bundles retrieved</b></br>");
-
-			console.log("Bundles supplied by the partner:", bundles);
-			// Get bundles from this user
+		}).then((partnerBundles) => {
+			displayBundlesPartner(partnerBundles);
 			return api.getUserBundles();
 		}).then(userBundles => {
-			$('#bundleRetrievalUser').append("<b>" + userBundles.length + " userBundles retrieved</b></br>");
-
-			console.log("Bundles on the users account:");
-			console.log(userBundles);
-			console.log("---");
-			// Instantiate a new bundle
+			displayBundlesUser(userBundles);
 			return api.instantiateBundle(bundleToInstantiate);
-		}).then(data => {
-			$('#BundleInstantiation').append("<b>Bundle instantiated: " + data.name + "</b></br>");
-
-			console.log("Instantiating bundle with request data:");
-			console.log(bundleToInstantiate);
-			console.log("Server returned:");
-			console.log(data);
-			console.log("---");
-
-			// Get bundles from this user again
+		}).then(instantiatedBundle => {
+			displayBundleInstantiation(instantiatedBundle);
 			return api.getUserBundles();
-		}).then(bundles => {
-			$('#bundleRetrievalUserTwo').append("<b>" + bundles.length + " bundles retrieved</b></br>");
-
-			console.log("Bundles on the users account:");
-			console.log(bundles);
-			console.log("---");
+		}).then(userBundles => {
+			displayBundlesUser(userBundles);
 		}).catch((error) => {
 			console.log(error.toString());
 			console.log(JSON.stringify(error));
 		});
+
+		function displayBundlesPartner(bundles) {
+			$('#bundleRetrievalPartner').innerHTML = "";
+			for (var i in bundles) {
+				$('#bundleRetrievalPartner').append("<div id='bundle'>" + bundles[i].name.en + " <button onclick='addBundle'>Add</button></div>");
+			}
+
+			console.log("Bundles supplied by the partner: ", bundles);
+		}
+
+		function displayBundlesUser(bundles) {
+			$('#bundleRetrievalUser').append("<b>" + bundles.length + " userBundles retrieved</b></br>");
+			console.log("Bundles on the users account: ", bundles);
+		}
+
+		function displayBundleInstantiation(bundle) {
+			$('#BundleInstantiation').append("<b>Bundle instantiated: " + bundle.name + "</b></br>");
+			console.log("Instantiating bundle with request data: ", bundleToInstantiate);
+			console.log("Server returned: ", bundle);
+		}
+
+		window.addBundle = function addBundle() {
+			console.log("aap");
+		};
 
 		window.connectChannel = function connectChannel() {
 			api.openInitChannel(channelId, function (data) {
