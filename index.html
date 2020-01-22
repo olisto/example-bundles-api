@@ -13,19 +13,27 @@
 	</head>
 
 	<body>
+		<style>
+			#bundle {
+				margin-left: 16px;
+				font-weight: 600;
+			}
+		</style>
+
 		<h1>SDK example</h1>
-		<p>Retrieving bundles (supplied by the partner):<br/><br/>
+		<p>Available:<br/>
 			<span id="bundleRetrievalPartner"></span>
 			<br/>
 		</p>
 
-		<p id="bundleRetrievalUser">Retrieving bundles (activated on this user account):<br/></p>
+		<p id="activatedBundleHeader">Activated: <span id="activatedHeader"></span><br/>
+			<span id="bundleRetrievalUser"></span>
+			<br/>
+		</p>
 
-		<p id="BundleInstantiation">Instantiating new bundle:</br></p>
+		<p id="BundleInstantiation">Instantiating new bundle:<br/></p>
 
-		<p id="bundleRetrievalUserTwo">Retrieving bundles again (Did the bundle get added?):</br></p>
-
-		<span>Connect channel (Eneco Toon)</br><button onclick="connectChannel()">Connect</button></span>
+		<span>Connect channel (Eneco Toon)<br/><button onclick="connectChannel()">Connect</button></span>
 		<p id="channelConnected"></p>
 	</body>
 
@@ -34,6 +42,8 @@
 		const appId = 'test.app.id';
 		const userId = 'userId0981238763425';
 		const channelId = 'eneco-toon';
+
+		const api = OlistoApi.init(partnerKey, appId, userId);
 
 		const bundleToInstantiate = {
 			bundleId: '5dfb9f675f4cf381a8f4bf9c',
@@ -57,21 +67,23 @@
 			],
 		};
 
-		const api = OlistoApi.init(partnerKey, appId, userId);
+		let partnerBundles = [];
 
 		api.getUserContext(userId).then(() => {
-			return api.getBundlesTemplate();
-		}).then((partnerBundles) => {
+			return api.getBundleTemplates();
+		}).then((bundles) => {
+			partnerBundles = bundles;
 			displayBundlesPartner(partnerBundles);
 			return api.getUserBundles();
 		}).then(userBundles => {
 			displayBundlesUser(userBundles);
-			return api.instantiateBundle(bundleToInstantiate);
+			// return api.instantiateBundle(bundleToInstantiate);
+			return function() {
+				return null;
+			};
 		}).then(instantiatedBundle => {
 			displayBundleInstantiation(instantiatedBundle);
 			return api.getUserBundles();
-		}).then(userBundles => {
-			displayBundlesUser(userBundles);
 		}).catch((error) => {
 			console.log(error.toString());
 			console.log(JSON.stringify(error));
@@ -80,14 +92,38 @@
 		function displayBundlesPartner(bundles) {
 			$('#bundleRetrievalPartner').innerHTML = "";
 			for (var i in bundles) {
-				$('#bundleRetrievalPartner').append("<div id='bundle'>" + bundles[i].name.en + " <button onclick='addBundle'>Add</button></div>");
+				$('#bundleRetrievalPartner').append(
+					"<div id='bundle'>" +
+						bundles[i].name.en +
+						" <button value='" + bundles[i].id + "' onclick='addBundle()'>Add</button><" +
+					"/div>"
+				);
 			}
 
 			console.log("Bundles supplied by the partner: ", bundles);
 		}
 
 		function displayBundlesUser(bundles) {
-			$('#bundleRetrievalUser').append("<b>" + bundles.length + " userBundles retrieved</b></br>");
+			$('#bundleRetrievalUser').empty();
+
+			$('#activatedHeader').empty();
+			if (bundles.length > 8) {
+				$('#activatedHeader').append("<i>(Retrieved " + bundles.length + " showing 10 max)</i>");
+			}
+
+			for (var i in bundles) {
+				$('#bundleRetrievalUser').append(
+					"<div id='bundle'>" +
+						bundles[i].name +
+						" <button value='" + bundles[i]._id + "' onclick='removeBundle()'>Delete</button><" +
+					"/div>"
+				);
+
+				if (i > 8) {
+					break;
+				}
+			}
+
 			console.log("Bundles on the users account: ", bundles);
 		}
 
@@ -98,7 +134,13 @@
 		}
 
 		window.addBundle = function addBundle() {
-			console.log("aap");
+			console.log(event.srcElement.value);
+			console.log(partnerBundles);
+		};
+
+		window.removeBundle = function removeBundle() {
+			console.log(event.srcElement.value);
+			api.removeBundle(event.srcElement.value);
 		};
 
 		window.connectChannel = function connectChannel() {
