@@ -33,8 +33,7 @@
 
 		<div id="BundleInstantiation"></div>
 
-		<!--<span>Connect Eneco Toon<br/><button value="eneco-toon" onclick="connectChannel()">Connect</button></span>-->
-		<!--<span>Connect Philips Hue<br/><button value="philips-hue" onclick="connectChannel()">Connect</button></span>-->
+		<div id="unitPicker"></div>
 
 		<p id="channelConnected"></p>
 	</body>
@@ -42,7 +41,8 @@
 	<script type="module">
 		const partnerKey = '7ze1d587238s7524f73k3333';
 		const appId = 'test.app.id';
-		const userId = 'userId0981238763425';
+		// const userId = 'userId0981238763425';
+		const userId = 'userId0981238763427';
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
@@ -133,7 +133,6 @@
 		}
 
 		let instanceBundle;
-
 		window.addBundle = function addBundle() {
 			console.log("Instantiating bundle");
 
@@ -148,37 +147,91 @@
 			let bundle = partnerBundles.find(function(bundle) {
 				return bundle.id === event.srcElement.value;
 			});
-			instanceBundle = bundle.getInstance();
 
-			writeLine(instanceBundle.name.en + "<br/>");
+			bundle.getInstance().then(function(returnedInstance) {
+				instanceBundle = returnedInstance;
+				writeLine(instanceBundle.name.en + "<br/>");
 
-			writeLine("<b>Requiring channels</b>");
-			console.log(instanceBundle.requirements);
-			Object.keys(instanceBundle.requirements).forEach((key) => {
-				writeLine("<span id='" + key + "'> " + key + " - <button value='" + key + "' onclick='connectChannel()'>Connect</button></span>");
-				console.log(instanceBundle.requirements[key]);
+				writeLine("<b>Requiring channels</b>");
+				console.log(instanceBundle.requirements);
+				Object.keys(instanceBundle.requirements).forEach((key) => {
+					if (!instanceBundle.requirements[key].isConnected) {
+						writeLine("<span id='" + key + "'> " + key + " - <button value='" + key + "' onclick='connectChannel()'>Connect</button></span>");
+					} else {
+						writeLine("<span id='" + key + "'>" + key + " - <b>Connected</b>");
+					}
+
+					console.log(instanceBundle.requirements[key]);
+				});
+
+				writeLine("<br/><button onclick='continueAddBundle()'>Continue</button>");
 			});
-
-			writeLine("<br/><button onclick='continueAddBundle()'>Continue</button>");
 		};
 
+		let resolvedUnits;
+		let currentUnit;
 		window.continueAddBundle = function continueAddBundle() {
-			// TODO If all channels connected
+			let stop = false;
+			Object.keys(instanceBundle.requirements).forEach((key) => {
+				if (!instanceBundle.requirements[key].isConnected) {
+					window.alert("Connect all channels first");
+					stop = true;
+				}
+			});
 
+			if (stop) {
+				return;
+			}
 
-
-
+			const unitPromises = [];
 			for (let page of instanceBundle.pages) {
 				for (let input of page.inputs) {
-					case()
+					switch(input.type) {
+						case "unit":
 
 
-					console.log(input);
+
+
+							unitPromises.push(input.getUnits());
+							break;
+						default:
+							break
+					}
 				}
 			}
 
-			return;
+			Promise.all(unitPromises).then(function(returnedUnits) {
+				console.log('returnedUnits', returnedUnits);
+				for (let page in instanceBundle.pages) {
+					for (let input in instanceBundle.pages[page].inputs) {
+						switch(instanceBundle.pages[page].inputs[input].type) {
+							case "unit":
+								console.log('input ' + page + ' - ' + input, instanceBundle.pages[page].inputs[input]);
+								console.log(returnedUnits[page][input]);
 
+
+
+
+								// unitPromises.push(input.getUnits());
+								break;
+							default:
+								break
+						}
+					}
+				}
+
+
+				currentUnit = 0;
+				resolvedUnits = returnedUnits;
+				pickUnit(currentUnit);
+			});
+		};
+
+		function pickUnit(unitIndex) {
+
+		}
+
+		function spare() {
 			instanceBundle.pages[0].inputs[0].getUnits().then((units) => {
 				const setResult = instanceBundle.pages[0].inputs[0].setValue({
 					_id: units[0]._id,
@@ -200,6 +253,7 @@
 			}).catch(handleError);
 		}
 
+
 		function write(html) {
 			$('#BundleInstantiation').append(html);
 		}
@@ -215,11 +269,15 @@
 
 		window.connectChannel = function connectChannel() {
 			console.log(event.srcElement.value);
-			api.openInitChannel(event.srcElement.value, function (data) {
-				$('#' + event.srcElement.value).empty();
-				$('#' + event.srcElement.value).append(event.srcElement.value + " - Connected");
-				console.log(data.channel + ' channel is ' + data.status);
-			});
+			api.openInitChannel(event.srcElement.value, channelListener);
+		};
+
+		const channelListener = function(data) {
+			// TODO - set channel connected in the requirements array
+
+			$('#' + data.channel).empty();
+			$('#' + data.channel).append(data.channel + " - <b>Connected</b>");
+			console.log(data.channel + ' channel is ' + data.status);
 		};
 	</script>
 </html>
