@@ -140,14 +140,13 @@
 
 			write("<h3>Instantiating new bundle:</h3>");
 
-
 			console.log(event.srcElement.value);
 			console.log(partnerBundles);
 
 			let bundle = partnerBundles.find(function(bundle) {
 				return bundle.id === event.srcElement.value;
 			});
-
+			
 			bundle.getInstance().then(function(returnedInstance) {
 				instanceBundle = returnedInstance;
 				writeLine(instanceBundle.name.en + "<br/>");
@@ -168,8 +167,6 @@
 			});
 		};
 
-		let resolvedUnits;
-		let currentUnit;
 		window.continueAddBundle = function continueAddBundle() {
 			let stop = false;
 			Object.keys(instanceBundle.requirements).forEach((key) => {
@@ -183,16 +180,43 @@
 				return;
 			}
 
-			const unitPromises = [];
+			function writeUnitLine(html) {
+				$('#unitPicker').append(html + "<br/>");
+			}
+
+			function forInput(input) {
+				$('#unitPicker').empty();
+
+				input.getUnits().then((units) => {
+					writeUnitLine("<br/><b>" + input.label.en + "</b>");
+					for (let unit of units) {
+						writeUnitLine("<b>" + unit.name + "</b>" + "<button id='" + unit._id + "'>Pick</button>");
+						$('#' + unit._id).click(function() {
+							let setResult;
+							if (input.multi) {
+								setResult = input.setValue([{
+									_id: unit._id,
+									endpoint: unit.endpoint,
+								}]);
+							} else {
+								setResult = input.setValue({
+									_id: unit._id,
+									endpoint: unit.endpoint,
+								});
+							}
+
+							console.log('Set is valid: ' + setResult);
+							console.log(unit);
+						});
+					}
+				});
+			}
+
 			for (let page of instanceBundle.pages) {
 				for (let input of page.inputs) {
 					switch(input.type) {
 						case "unit":
-
-
-
-
-							unitPromises.push(input.getUnits());
+							forInput(input);
 							break;
 						default:
 							break
@@ -200,36 +224,20 @@
 				}
 			}
 
-			Promise.all(unitPromises).then(function(returnedUnits) {
-				console.log('returnedUnits', returnedUnits);
-				for (let page in instanceBundle.pages) {
-					for (let input in instanceBundle.pages[page].inputs) {
-						switch(instanceBundle.pages[page].inputs[input].type) {
-							case "unit":
-								console.log('input ' + page + ' - ' + input, instanceBundle.pages[page].inputs[input]);
-								console.log(returnedUnits[page][input]);
+			writeUnitLine("<br/><button onclick='saveBundle()'>Save</button>");
+		};
 
-
-
-
-								// unitPromises.push(input.getUnits());
-								break;
-							default:
-								break
-						}
-					}
-				}
-
-
-				currentUnit = 0;
-				resolvedUnits = returnedUnits;
-				pickUnit(currentUnit);
+		window.saveBundle = function saveBundle() {
+			instanceBundle.save('Bundle test Michael').then((bundleSaved) => {
+				console.log('*******************');
+				console.log(JSON.stringify(bundleSaved));
 			});
 		};
 
-		function pickUnit(unitIndex) {
+		window.pickUnit = function pickUnit() {
+			console.log(event.srcElement);
+		};
 
-		}
 
 		function spare() {
 			instanceBundle.pages[0].inputs[0].getUnits().then((units) => {
@@ -261,6 +269,7 @@
 		function writeLine(html) {
 			$('#BundleInstantiation').append(html + "<br/>");
 		}
+
 
 		window.removeBundle = function removeBundle() {
 			console.log(event.srcElement.value);
