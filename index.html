@@ -31,10 +31,10 @@
 			<br/>
 		</p>
 
-		<p id="BundleInstantiation">Instantiating new bundle:<br/></p>
+		<div id="BundleInstantiation"></div>
 
-		<span>Connect Eneco Toon<br/><button value="eneco-toon" onclick="connectChannel()">Connect</button></span>
-		<span>Connect Philips Hue<br/><button value="philips-hue" onclick="connectChannel()">Connect</button></span>
+		<!--<span>Connect Eneco Toon<br/><button value="eneco-toon" onclick="connectChannel()">Connect</button></span>-->
+		<!--<span>Connect Philips Hue<br/><button value="philips-hue" onclick="connectChannel()">Connect</button></span>-->
 
 		<p id="channelConnected"></p>
 	</body>
@@ -78,13 +78,6 @@
 			return api.getUserBundles();
 		}).then(userBundles => {
 			displayBundlesUser(userBundles);
-			// return api.instantiateBundle(bundleToInstantiate);
-			return function() {
-				return null;
-			};
-		}).then(instantiatedBundle => {
-			displayBundleInstantiation(instantiatedBundle);
-			return api.getUserBundles();
 		}).catch((error) => {
 			console.log(error.toString());
 			console.log(JSON.stringify(error));
@@ -108,7 +101,7 @@
 			$('#bundleRetrievalUser').empty();
 
 			$('#activatedHeader').empty();
-			if (bundles.length > 8) {
+			if (bundles.length > 9) {
 				$('#activatedHeader').append("<i>(Retrieved " + bundles.length + " showing 10 max)</i>");
 			}
 
@@ -134,12 +127,86 @@
 			console.log("Server returned: ", bundle);
 		}
 
+		function handleError(error) {
+			console.log(error.toString());
+			console.log(JSON.stringify(error));
+		}
+
+		let instanceBundle;
+
 		window.addBundle = function addBundle() {
+			console.log("Instantiating bundle");
+
+			$('#BundleInstantiation').empty();
+
+			write("<h3>Instantiating new bundle:</h3>");
+
+
 			console.log(event.srcElement.value);
 			console.log(partnerBundles);
 
-			// partnerBundles[0].
+			let bundle = partnerBundles.find(function(bundle) {
+				return bundle.id === event.srcElement.value;
+			});
+			instanceBundle = bundle.getInstance();
+
+			writeLine(instanceBundle.name.en + "<br/>");
+
+			writeLine("<b>Requiring channels</b>");
+			console.log(instanceBundle.requirements);
+			Object.keys(instanceBundle.requirements).forEach((key) => {
+				writeLine("<span id='" + key + "'> " + key + " - <button value='" + key + "' onclick='connectChannel()'>Connect</button></span>");
+				console.log(instanceBundle.requirements[key]);
+			});
+
+			writeLine("<br/><button onclick='continueAddBundle()'>Continue</button>");
 		};
+
+		window.continueAddBundle = function continueAddBundle() {
+			// TODO If all channels connected
+
+
+
+
+			for (let page of instanceBundle.pages) {
+				for (let input of page.inputs) {
+					case()
+
+
+					console.log(input);
+				}
+			}
+
+			return;
+
+			instanceBundle.pages[0].inputs[0].getUnits().then((units) => {
+				const setResult = instanceBundle.pages[0].inputs[0].setValue({
+					_id: units[0]._id,
+					endpoint: units[0].endpoint,
+				});
+
+				console.log('Set is valid: ' + setResult);
+				return instanceBundle.pages[0].inputs[1].getUnits();
+			}).then((ligths) => {
+				const setResult = instanceBundle.pages[0].inputs[1].setValue([{
+					_id: ligths[0]._id,
+					endpoint: ligths[0].endpoint,
+				}]);
+				console.log('Set is valid: ' + setResult);
+				return instanceBundle.save('Bundle test Michael');
+			}).then((bundleSaved) => {
+				console.log('*******************');
+				console.log(JSON.stringify(bundleSaved));
+			}).catch(handleError);
+		}
+
+		function write(html) {
+			$('#BundleInstantiation').append(html);
+		}
+
+		function writeLine(html) {
+			$('#BundleInstantiation').append(html + "<br/>");
+		}
 
 		window.removeBundle = function removeBundle() {
 			console.log(event.srcElement.value);
@@ -148,10 +215,10 @@
 
 		window.connectChannel = function connectChannel() {
 			console.log(event.srcElement.value);
-			return;
-			api.openInitChannel(channelId, function (data) {
+			api.openInitChannel(event.srcElement.value, function (data) {
+				$('#' + event.srcElement.value).empty();
+				$('#' + event.srcElement.value).append(event.srcElement.value + " - Connected");
 				console.log(data.channel + ' channel is ' + data.status);
-				$('#channelConnected').append("<b>" + data.channel + " channel is " + data.status + "</b></br>");
 			});
 		};
 	</script>
