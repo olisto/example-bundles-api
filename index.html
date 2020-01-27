@@ -26,7 +26,8 @@
 	<script type="module">
 		const partnerKey = '7ze1d587238s7524f73k3333';
 		const appId = 'test.app.id';
-		const userId = 'userId0981238763425';
+		// const userId = 'userId0981238763425';
+		const userId = 'userId420420';
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
@@ -48,8 +49,10 @@
 			let bundlesPartnerDiv = $("#bundlesPartner");
 			bundlesPartnerDiv.html("<b>Available:</b>");
 			for (var i in partnerBundles) {
+				// console.log(partnerBundles[i]);
 				bundlesPartnerDiv.append(
 					"<div id='bundle'>" +
+						// "<img src='" +  + "' alt='Smiley face' height='42' width='42'>" +
 						partnerBundles[i].name.en +
 						" <button value='" + partnerBundles[i].id + "' onclick='addBundle()'>Add</button>" +
 					"</div>"
@@ -85,8 +88,6 @@
 			$("#bundlesPartner").html("");
 			$("#bundlesUser").html("");
 
-			console.log("Instantiating bundle");
-
 			$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
 
 			let bundle = partnerBundles.find(function(bundle) {
@@ -104,13 +105,15 @@
 		window.displayRequiredChannels = function displayRequiredChannels() {
 			$("#requiredChannels").html("<b>Requiring channels:</b><br/>");
 
+			console.log(instanceBundle.requirements);
 			Object.keys(instanceBundle.requirements).forEach((key) => {
-				if (!instanceBundle.requirements[key].isConnected) {
+				if (instanceBundle.requirements[key].isConnected || instanceBundle.requirements[key].connectMethod === "plain") {
+					$("#requiredChannels").append("<span id='" + key + "'>" + key + " - <b>Connected</b><br/>");
+				} else {
 					$("#requiredChannels").append("<span id='" + key + "'> " + key + " " +
 						"<button value='" + key + "' onclick='connectChannel()'>Connect</button>" +
-					"</span><br/>");
-				} else {
-					$("#requiredChannels").append("<span id='" + key + "'>" + key + " - <b>Connected</b><br/>");
+						"</span><br/>"
+					);
 				}
 			});
 		};
@@ -180,6 +183,9 @@
 						case "unit":
 							forInput(input);
 							break;
+
+
+
 						default:
 							break
 					}
@@ -223,11 +229,9 @@
 		};
 
 		window.connectChannel = function connectChannel() {
-			api.openInitChannel(event.srcElement.value, channelListener);
-		};
-
-		const channelListener = function() {
-			displayRequiredChannels();
+			api.openInitChannel(event.srcElement.value, function() {
+				displayRequiredChannels();
+			});
 		};
 
 		window.returnToOverview = function returnToOverview() {
@@ -239,6 +243,11 @@
 			$("#unitPicker").html("");
 			$("#nameInputHolder").html("");
 			$("#continueButton").html("");
+		};
+
+		// TODO - This should not be hardcoded and will be a part of the SDK.
+		window.getFullImgURL = function getFullImgURL(id) {
+			return 'https:/connect-kpn.olisto.com/api/v1/files/' + id;
 		};
 
 		function handleError(error) {
