@@ -5,11 +5,17 @@
 		<title>Olisto SDK Example</title>
 		<meta name="description" content="An example for the Olisto SDK">
 
-		<script src="node_modules/jquery/dist/jquery.js"></script>
+		<script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
 		<script src="lib/olisto-sdk.js"></script>
 	</head>
 
 	<body>
+		<style>
+			#bundle > img {
+				margin-right: 6px;
+			}
+		</style>
+
 		<h2>SDK example</h2>
 
 		<div id="bundlesPartner"></div>
@@ -26,8 +32,8 @@
 	<script type="module">
 		const partnerKey = '7ze1d587238s7524f73k3333';
 		const appId = 'test.app.id';
-		// const userId = 'userId0981238763425';
-		const userId = 'userId420420';
+		const userId = 'userId0981238763425';
+		// const userId = 'userId420420ab';
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
@@ -48,13 +54,12 @@
 		function displayBundlesPartner() {
 			let bundlesPartnerDiv = $("#bundlesPartner");
 			bundlesPartnerDiv.html("<b>Available:</b>");
-			for (var i in partnerBundles) {
-				// console.log(partnerBundles[i]);
+			for (let bundle of partnerBundles) {
 				bundlesPartnerDiv.append(
 					"<div id='bundle'>" +
-						// "<img src='" +  + "' alt='Smiley face' height='42' width='42'>" +
-						partnerBundles[i].name.en +
-						" <button value='" + partnerBundles[i].id + "' onclick='addBundle()'>Add</button>" +
+						"<img src='" + getFullImgURL(bundle.images.header) + "' height='42' width='84'>" +
+						bundle.name.en +
+						" <button value='" + bundle.id + "' onclick='addBundle()'>Add</button>" +
 					"</div>"
 				);
 			}
@@ -69,10 +74,10 @@
 			}
 			bundlesUserDiv.append("<br/>");
 
-			for (var i in userBundles) {
+			for (let i in userBundles) {
 				bundlesUserDiv.append(
 					"<div id='bundle'>" +
-						userBundles[i].name +
+					userBundles[i].name +
 						" <button value='" + userBundles[i]._id + "' onclick='removeBundle()'>Delete</button>" +
 					"</div>"
 				);
@@ -105,7 +110,6 @@
 		window.displayRequiredChannels = function displayRequiredChannels() {
 			$("#requiredChannels").html("<b>Requiring channels:</b><br/>");
 
-			console.log(instanceBundle.requirements);
 			Object.keys(instanceBundle.requirements).forEach((key) => {
 				if (instanceBundle.requirements[key].isConnected || instanceBundle.requirements[key].connectMethod === "plain") {
 					$("#requiredChannels").append("<span id='" + key + "'>" + key + " - <b>Connected</b><br/>");
@@ -183,9 +187,6 @@
 						case "unit":
 							forInput(input);
 							break;
-
-
-
 						default:
 							break
 					}
