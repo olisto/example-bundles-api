@@ -13,104 +13,75 @@
 	</head>
 
 	<body>
-		<style>
-			#bundle {
-				margin-left: 16px;
-				font-weight: 600;
-			}
-		</style>
+		<h2>SDK example</h2>
 
-		<h1>SDK example</h1>
-		<p>Available:<br/>
-			<span id="bundleRetrievalPartner"></span>
-			<br/>
-		</p>
+		<div id="bundlesPartner"></div>
+		<div id="bundlesUser"></div>
 
-		<p id="activatedBundleHeader">Activated: <span id="activatedHeader"></span><br/>
-			<span id="bundleRetrievalUser"></span>
-			<br/>
-		</p>
+		<div id="cancelButton"></div>
 
-		<div id="BundleInstantiation"></div>
+		<div id="bundleInstantiation"></div>
+
+		<div id="requiredChannels"></div>
 
 		<div id="unitPicker"></div>
 
-		<p id="channelConnected"></p>
+		<div id="continueButton"></div>
 	</body>
 
 	<script type="module">
 		const partnerKey = '7ze1d587238s7524f73k3333';
 		const appId = 'test.app.id';
-		// const userId = 'userId0981238763425';
-		const userId = 'userId0981238763427';
+		const userId = 'userId0981238763425';
+		// const userId = 'userId0981238763427';
 
 		const api = OlistoApi.init(partnerKey, appId, userId);
 
-		const bundleToInstantiate = {
-			bundleId: '5dfb9f675f4cf381a8f4bf9c',
-			name: 'test_SDK',
-			wizardOutput: [
-				[
-					'5c541927962d7b5cb63ee598',
-					{
-						endpoint: 'geofencing.5c545fe2468bc962fc28aacc',
-						_id: '5c545fe2468bc962fc28aacc',
-					},
-				],
-				[
-					[
-						{
-							endpoint: 'tplink.80121B61A8C743DBFB6142DE6D1B926B1B6763E5',
-							_id: '5d6ce03e5596f54f5a6391ec',
-						},
-					],
-				],
-			],
-		};
-
 		let partnerBundles = [];
+		let userBundles = [];
 
 		api.getUserContext(userId).then(() => {
 			return api.getBundleTemplates();
-		}).then((bundles) => {
-			partnerBundles = bundles;
-			displayBundlesPartner(partnerBundles);
+		}).then((serverPartnerBundles) => {
+			partnerBundles = serverPartnerBundles;
+			displayBundlesPartner();
 			return api.getUserBundles();
-		}).then(userBundles => {
-			displayBundlesUser(userBundles);
+		}).then(serverUserBundles => {
+			userBundles = serverUserBundles;
+			displayBundlesUser();
 		}).catch((error) => {
 			console.log(error.toString());
 			console.log(JSON.stringify(error));
 		});
 
-		function displayBundlesPartner(bundles) {
-			$('#bundleRetrievalPartner').innerHTML = "";
-			for (var i in bundles) {
-				$('#bundleRetrievalPartner').append(
+		function displayBundlesPartner() {
+			$('#bundlesPartner').html("<b>Available:</b>");
+			for (var i in partnerBundles) {
+				$('#bundlesPartner').append(
 					"<div id='bundle'>" +
-						bundles[i].name.en +
-						" <button value='" + bundles[i].id + "' onclick='addBundle()'>Add</button><" +
-					"/div>"
+						partnerBundles[i].name.en +
+						" <button value='" + partnerBundles[i].id + "' onclick='addBundle()'>Add</button>" +
+					"</div>"
 				);
 			}
+			$('#bundlesPartner').append("<br/>");
 
-			console.log("Bundles supplied by the partner: ", bundles);
+			console.log("Bundles supplied by the partner: ", partnerBundles);
 		}
 
-		function displayBundlesUser(bundles) {
-			$('#bundleRetrievalUser').empty();
-
-			$('#activatedHeader').empty();
-			if (bundles.length > 9) {
-				$('#activatedHeader').append("<i>(Retrieved " + bundles.length + " showing 10 max)</i>");
+		function displayBundlesUser() {
+			$('#bundlesUser').html("<b>Activated:</b>");
+			if (userBundles.length > 9) {
+				$('#bundlesUser').append("<i>(Retrieved " + userBundles.length + " showing 10 max)</i>");
 			}
+			$('#bundlesUser').append("<br/>");
 
-			for (var i in bundles) {
-				$('#bundleRetrievalUser').append(
+			for (var i in userBundles) {
+				$('#bundlesUser').append(
 					"<div id='bundle'>" +
-						bundles[i].name +
-						" <button value='" + bundles[i]._id + "' onclick='removeBundle()'>Delete</button><" +
-					"/div>"
+						userBundles[i].name +
+						" <button value='" + userBundles[i]._id + "' onclick='removeBundle()'>Delete</button>" +
+					"</div>"
 				);
 
 				if (i > 8) {
@@ -118,52 +89,49 @@
 				}
 			}
 
-			console.log("Bundles on the users account: ", bundles);
-		}
-
-		function displayBundleInstantiation(bundle) {
-			$('#BundleInstantiation').append("<b>Bundle instantiated: " + bundle.name + "</b></br>");
-			console.log("Instantiating bundle with request data: ", bundleToInstantiate);
-			console.log("Server returned: ", bundle);
-		}
-
-		function handleError(error) {
-			console.log(error.toString());
-			console.log(JSON.stringify(error));
+			console.log("Bundles on the users account: ", userBundles);
 		}
 
 		let instanceBundle;
 		window.addBundle = function addBundle() {
+			$('#bundlesPartner').html("");
+			$('#bundlesUser').html("");
+
 			console.log("Instantiating bundle");
 
-			$('#BundleInstantiation').empty();
-
-			write("<h3>Instantiating new bundle:</h3>");
-
-			console.log(event.srcElement.value);
-			console.log(partnerBundles);
+			$('#cancelButton').html("<button onclick='cancelBundle()'>Cancel</button><br/><br/>");
 
 			let bundle = partnerBundles.find(function(bundle) {
 				return bundle.id === event.srcElement.value;
 			});
-			
+
 			bundle.getInstance().then(function(returnedInstance) {
 				instanceBundle = returnedInstance;
-				writeLine(instanceBundle.name.en + "<br/>");
+				$('#bundleInstantiation').html("<b>Instantiating new bundle:</b><br/>" + instanceBundle.name.en + "<br/><br/>");
+				$('#continueButton').html("<br/><button onclick='continueAddBundle()'>Continue</button>");
+				displayRequiredChannels();
+			});
+		};
 
-				writeLine("<b>Requiring channels</b>");
-				console.log(instanceBundle.requirements);
-				Object.keys(instanceBundle.requirements).forEach((key) => {
-					if (!instanceBundle.requirements[key].isConnected) {
-						writeLine("<span id='" + key + "'> " + key + " - <button value='" + key + "' onclick='connectChannel()'>Connect</button></span>");
-					} else {
-						writeLine("<span id='" + key + "'>" + key + " - <b>Connected</b>");
-					}
+		window.cancelBundle = function cancelBundle() {
+			displayBundlesPartner();
+			displayBundlesUser();
+			$('#cancelButton').html("");
+			$('#bundleInstantiation').html("");
+			$('#requiredChannels').html("");
+			$('#unitPicker').html("");
+			$('#continueButton').html("");
+		};
 
-					console.log(instanceBundle.requirements[key]);
-				});
+		window.displayRequiredChannels = function printRequiredChannels() {
+			$('#requiredChannels').html("<b>Requiring channels:</b><br/>");
 
-				writeLine("<br/><button onclick='continueAddBundle()'>Continue</button>");
+			Object.keys(instanceBundle.requirements).forEach((key) => {
+				if (!instanceBundle.requirements[key].isConnected) {
+					$('#requiredChannels').append("<span id='" + key + "'> " + key + " - <button value='" + key + "' onclick='connectChannel()'>Connect</button></span><br/>");
+				} else {
+					$('#requiredChannels').append("<span id='" + key + "'>" + key + " - <b>Connected</b><br/>");
+				}
 			});
 		};
 
@@ -184,16 +152,23 @@
 				$('#unitPicker').append(html + "<br/>");
 			}
 
+
 			function forInput(input) {
 				$('#unitPicker').empty();
 
 				input.getUnits().then((units) => {
 					writeUnitLine("<br/><b>" + input.label.en + "</b>");
 					for (let unit of units) {
-						writeUnitLine("<b>" + unit.name + "</b>" + "<button id='" + unit._id + "'>Pick</button>");
-						$('#' + unit._id).click(function() {
+						$('#unitPicker').append(
+							"<div id='total" + unit._id + "'>" +
+							unit.name +
+							" <button id='" + unit._id + "'>Pick</button>" +
+							"</div>");
+						$('#' + unit._id).click(function () {
 							let setResult;
+							$('#total' + unit._id).html("<b>" + unit.name + " - picked</b>");
 							if (input.multi) {
+								// TODO - multi array add value
 								setResult = input.setValue([{
 									_id: unit._id,
 									endpoint: unit.endpoint,
@@ -204,9 +179,7 @@
 									endpoint: unit.endpoint,
 								});
 							}
-
-							console.log('Set is valid: ' + setResult);
-							console.log(unit);
+							console.log('Set is valid: ' + setResult, unit);
 						});
 					}
 				});
@@ -224,7 +197,7 @@
 				}
 			}
 
-			writeUnitLine("<br/><button onclick='saveBundle()'>Save</button>");
+			$('#continueButton').html("<br/><button onclick='saveBundle()'>Save</button>");
 		};
 
 		window.saveBundle = function saveBundle() {
@@ -238,42 +211,16 @@
 			console.log(event.srcElement);
 		};
 
-
-		function spare() {
-			instanceBundle.pages[0].inputs[0].getUnits().then((units) => {
-				const setResult = instanceBundle.pages[0].inputs[0].setValue({
-					_id: units[0]._id,
-					endpoint: units[0].endpoint,
-				});
-
-				console.log('Set is valid: ' + setResult);
-				return instanceBundle.pages[0].inputs[1].getUnits();
-			}).then((ligths) => {
-				const setResult = instanceBundle.pages[0].inputs[1].setValue([{
-					_id: ligths[0]._id,
-					endpoint: ligths[0].endpoint,
-				}]);
-				console.log('Set is valid: ' + setResult);
-				return instanceBundle.save('Bundle test Michael');
-			}).then((bundleSaved) => {
-				console.log('*******************');
-				console.log(JSON.stringify(bundleSaved));
-			}).catch(handleError);
-		}
-
-
-		function write(html) {
-			$('#BundleInstantiation').append(html);
-		}
-
-		function writeLine(html) {
-			$('#BundleInstantiation').append(html + "<br/>");
-		}
-
-
 		window.removeBundle = function removeBundle() {
-			console.log(event.srcElement.value);
-			api.removeBundle(event.srcElement.value);
+			api.removeBundle(event.srcElement.value).then(() => {
+				return api.getUserBundles();
+			}).then(serverUserBundles => {
+				userBundles = serverUserBundles;
+				displayBundlesUser();
+			}).catch((error) => {
+				console.log(error.toString());
+				console.log(JSON.stringify(error));
+			});
 		};
 
 		window.connectChannel = function connectChannel() {
@@ -284,9 +231,13 @@
 		const channelListener = function(data) {
 			// TODO - set channel connected in the requirements array
 
-			$('#' + data.channel).empty();
-			$('#' + data.channel).append(data.channel + " - <b>Connected</b>");
+			displayRequiredChannels();
 			console.log(data.channel + ' channel is ' + data.status);
 		};
+
+		function handleError(error) {
+			console.log(error.toString());
+			console.log(JSON.stringify(error));
+		}
 	</script>
 </html>
