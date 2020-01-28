@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Olisto SDK Example</title>
+		<meta name="description" content="An example for the Olisto SDK">
+
+		<script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
+		<script src="lib/olisto-sdk.js"></script>
+	</head>
+
+	<body>
+		<style>
+			#bundle > img {
+				margin-right: 6px;
+			}
+		</style>
+
+		<h2>SDK example</h2>
+
+		<div id="bundlesPartner"></div>
+		<div id="bundlesUser"></div>
+
+		<div id="cancelButton"></div>
+		<div id="bundleInstantiation"></div>
+		<div id="requiredChannels"></div>
+		<div id="unitPicker"></div>
+		<div id="nameInputHolder"></div>
+		<div id="continueButton"></div>
+	</body>
+
+	<script type="module">
+		const partnerKey = '7ze1d587238s7524f73k3333';
+		const appId = 'test.app.id';
+		const userId = 'userId0981238763425';
+		// const userId = 'userId420420ab';
+
+		const api = OlistoApi.init(partnerKey, appId, userId);
+
+		let partnerBundles = [];
+		let userBundles = [];
+
+		api.getUserContext(userId).then(() => {
+			return api.getBundleTemplates();
+		}).then((serverPartnerBundles) => {
+			partnerBundles = serverPartnerBundles;
+			displayBundlesPartner();
+			return api.getUserBundles();
+		}).then(serverUserBundles => {
+			userBundles = serverUserBundles;
+			displayBundlesUser();
+		}).catch(handleError);
+
+		function displayBundlesPartner() {
+			let bundlesPartnerDiv = $("#bundlesPartner");
+			bundlesPartnerDiv.html("<b>Available:</b>");
+			for (let bundle of partnerBundles) {
+				bundlesPartnerDiv.append(
+					"<div id='bundle'>" +
+						"<img src='" + getFullImgURL(bundle.images.header) + "' height='42' width='84'>" +
+						bundle.name.en +
+						" <button value='" + bundle.id + "' onclick='addBundle()'>Add</button>" +
+					"</div>"
+				);
+			}
+			bundlesPartnerDiv.append("<br/>");
+		}
+
+		function displayBundlesUser() {
+			let bundlesUserDiv = $("#bundlesUser");
+			bundlesUserDiv.html("<b>Activated:</b>");
+			if (userBundles.length > 9) {
+				bundlesUserDiv.append("<i>(Retrieved " + userBundles.length + " showing 10 max)</i>");
+			}
+			bundlesUserDiv.append("<br/>");
+
+			for (let i in userBundles) {
+				bundlesUserDiv.append(
+					"<div id='bundle'>" +
+					userBundles[i].name +
+						" <button value='" + userBundles[i]._id + "' onclick='removeBundle()'>Delete</button>" +
+					"</div>"
+				);
+
+				if (i > 8) {
+					break;
+				}
+			}
+		}
+
+		let instanceBundle;
+		window.addBundle = function addBundle() {
+			$("#bundlesPartner").html("");
+			$("#bundlesUser").html("");
+
+			$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
+
+			let bundle = partnerBundles.find(function(bundle) {
+				return bundle.id === event.srcElement.value;
+			});
+
+			bundle.getInstance().then(function(returnedInstance) {
+				instanceBundle = returnedInstance;
+				$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + instanceBundle.name.en + "<br/><br/>");
+				$("#continueButton").html("<br/><button onclick='pickUnits()'>Continue</button>");
+				displayRequiredChannels();
+			});
+		};
+
+		window.displayRequiredChannels = function displayRequiredChannels() {
+			$("#requiredChannels").html("<b>Requiring channels:</b><br/>");
+
+			Object.keys(instanceBundle.requirements).forEach((key) => {
+				if (instanceBundle.requirements[key].isConnected || instanceBundle.requirements[key].connectMethod === "plain") {
+					$("#requiredChannels").append("<span id='" + key + "'>" + key + " - <b>Connected</b><br/>");
+				} else {
+					$("#requiredChannels").append("<span id='" + key + "'> " + key + " " +
+						"<button value='" + key + "' onclick='connectChannel()'>Connect</button>" +
+						"</span><br/>"
+					);
+				}
+			});
+		};
+
+		let multiInputArray = [];
+		window.pickUnits = function pickUnits() {
+			let stop = false;
+			Object.keys(instanceBundle.requirements).forEach((key) => {
+				if (!instanceBundle.requirements[key].isConnected) {
+					window.alert("Connect all channels first");
+					stop = true;
+				}
+			});
+
+			if (stop) {
+				return;
+			}
+
+			function forInput(input) {
+				$("#unitPicker").empty();
+
+				if (input.multi) {
+					multiInputArray.push({
+						'input': input,
+						'units': []
+					});
+				}
+
+				function addMultiInput(input, unit) {
+					for (let multiInput of multiInputArray) {
+						if (input === multiInput.input) {
+							multiInput.units.push({
+								_id: unit._id,
+								endpoint: unit.endpoint,
+							});
+						}
+					}
+				}
+
+				input.getUnits().then((units) => {
+					$("#unitPicker").append("<br/><b>" + input.label.en + "</b>");
+					for (let unit of units) {
+						$("#unitPicker").append(
+							"<div id='total" + unit._id + "'>" +
+							unit.name +
+							" <button id='" + unit._id + "'>Pick</button>" +
+							"</div>");
+						$("#" + unit._id).click(function() {
+							$("#total" + unit._id).html("<b>" + unit.name + " - picked</b>");
+							if (input.multi) {
+								addMultiInput(input, unit);
+							} else {
+								let setResult = input.setValue({
+									_id: unit._id,
+									endpoint: unit.endpoint,
+								});
+								console.log('Set is valid: ' + setResult, unit);
+							}
+						});
+					}
+				});
+			}
+
+			for (let page of instanceBundle.pages) {
+				for (let input of page.inputs) {
+					switch(input.type) {
+						case "unit":
+							forInput(input);
+							break;
+						default:
+							break
+					}
+				}
+			}
+
+			$("#continueButton").html("<br/><button onclick='nameBundle()'>Continue</button>");
+		};
+
+		window.nameBundle = function nameBundle() {
+			$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name'>");
+			$("#continueButton").html("<br/><button onclick='saveBundle()'>Save</button>");
+		};
+
+		window.saveBundle = function saveBundle() {
+			if ($('#nameInput').val() === "") {
+				alert('Name bundle first');
+				return;
+			}
+
+			for (let multiInput of multiInputArray) {
+				multiInput.input.setValue(multiInput.units);
+			}
+
+			instanceBundle.save($('#nameInput').val()).then((bundleSaved) => {
+				console.log("Bundle saved", bundleSaved);
+				return api.getUserBundles();
+			}).then(serverUserBundles => {
+				userBundles = serverUserBundles;
+				returnToOverview();
+			}).catch(handleError);
+		};
+
+		window.removeBundle = function removeBundle() {
+			api.removeBundle(event.srcElement.value).then(() => {
+				return api.getUserBundles();
+			}).then(serverUserBundles => {
+				userBundles = serverUserBundles;
+				returnToOverview();
+			}).catch(handleError);
+		};
+
+		window.connectChannel = function connectChannel() {
+			api.openInitChannel(event.srcElement.value, function() {
+				displayRequiredChannels();
+			});
+		};
+
+		window.returnToOverview = function returnToOverview() {
+			displayBundlesPartner();
+			displayBundlesUser();
+			$("#cancelButton").html("");
+			$("#bundleInstantiation").html("");
+			$("#requiredChannels").html("");
+			$("#unitPicker").html("");
+			$("#nameInputHolder").html("");
+			$("#continueButton").html("");
+		};
+
+		// TODO - This should not be hardcoded and will be a part of the SDK.
+		window.getFullImgURL = function getFullImgURL(id) {
+			return 'https:/connect-kpn.olisto.com/api/v1/files/' + id;
+		};
+
+		function handleError(error) {
+			console.log(error.toString());
+			console.log(JSON.stringify(error));
+		}
+	</script>
+</html>
