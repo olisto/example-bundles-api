@@ -1,0 +1,76 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+
+<dom-module id="app-iframe">
+	<template>
+		<style>
+			:host {
+				margin: 16px 32px;
+				display: block;
+			}
+
+			#iframe {
+				margin-top: 20px;
+				height: 600px;
+				width: 320px;
+			}
+
+			.flexBox {
+				display: flex;
+				flex-direction: row;
+			}
+
+			#input {
+				flex-grow: 1;
+			}
+
+			.button {
+				height: 42px;
+				margin: 10px 0 10px 16px;
+			}
+		</style>
+
+		<h3>Partner portal</h3>
+
+		<div class="flexBox">
+			<paper-input id="input"></paper-input>
+			<paper-button class="button" raised on-click="passData">Send</paper-button>
+		</div>
+
+		<iframe id="iframe" src="http://localhost:5000"></iframe>
+		<!--<iframe id="iframetwo" src="localhost:5000"></iframe>-->
+	</template>
+
+	<script>
+		class AppIframe extends Polymer.Element {
+			static get is() { return 'app-iframe'; }
+			static get properties() {
+				return {
+					prop: {
+						type: String,
+						value: ' app-iframe'
+					}
+				};
+			}
+
+			ready() {
+				super.ready();
+
+				this.$.iframe.addEventListener('load', (event) => {
+					console.log('iframe is fully loaded', event);
+				});
+
+				window.addEventListener('passData', function (event) {
+					this.$.input.value = event.detail;
+				}.bind(this));
+			}
+
+			passData() {
+				this.$.iframe.contentWindow.dispatchEvent(new CustomEvent('passData', {detail: this.$.input.value}));
+			}
+		}
+
+		window.customElements.define(AppIframe.is, AppIframe);
+	</script>
+</dom-module>

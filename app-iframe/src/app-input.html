@@ -1,0 +1,40 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+
+<dom-module id="app-input">
+	<template>
+		<h2>Olisto App</h2>
+		<paper-input id="input"></paper-input>
+		<paper-button raised on-click="passData">Now</paper-button>
+	</template>
+
+	<script>
+		class AppInput extends Polymer.Element {
+			static get is() { return 'app-input'; }
+
+			static get properties() {
+				return {
+					experiences: {
+						type: Array,
+						value: []
+					},
+				};
+			}
+
+			ready() {
+				super.ready();
+
+				window.addEventListener('passData', function(event) {
+					this.$.input.value = event.detail;
+				}.bind(this));
+			}
+
+			passData() {
+				parent.dispatchEvent(new CustomEvent('passData', {detail: this.$.input.value}));
+			}
+		}
+
+		window.customElements.define(AppInput.is, AppInput);
+	</script>
+</dom-module>
