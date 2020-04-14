@@ -24,9 +24,9 @@
 
 		<div id="cancelButton"></div>
 		<div id="bundleInstantiation"></div>
+		<div id="nameInputHolder"></div>
 		<div id="requiredChannels"></div>
 		<div id="unitPicker"></div>
-		<div id="nameInputHolder"></div>
 		<div id="continueButton"></div>
 	</body>
 
@@ -54,7 +54,7 @@
 					//404 is expected while in progress. Anything else is a real error
 					if (result.status !== 404) {
 						clearInterval(intervalHandle);
-						throw new Error('Can not log in');
+						throw new Error('Cannot log in');
 					}
 				});
 
@@ -73,6 +73,22 @@
 		function demoForContext(token) {
 			let partnerBundles = [];
 			let userBundles = [];
+			
+			// let channels = $.ajax({
+			// 	url: baseUrl + '/api/v1/channel/descriptions',
+			// 	method: 'GET',
+			// 	headers: {'Authorization': 'Bearer ' + token},
+			// 	data: {"includeConnections": 1},
+			// 	async: false
+			// })
+			// console.log('channels', channels);
+			// console.log('channels', channels.responseJSON);
+			// console.log('triggi buttons', channels.responseJSON["triggi-buttons"]);
+			// console.log("delete response", $.ajax({
+			// 	url: baseUrl + '/api/v1/channelaccounts/' + channels.responseJSON["triggi-buttons"].channelAccounts[0]._id,
+			// 	method: 'DELETE',
+			// 	headers: {'Authorization': 'Bearer ' + token}
+			// }));
 
 			let retrieveUserBundles = {
 				url: baseUrl + '/api/v2/bundleInstances',
@@ -127,7 +143,6 @@
 						" <button value='" + userBundles[i]._id + "' onclick='removeBundle()'>Delete</button>" +
 						"</div>"
 					);
-
 					if (i > 8) {
 						break;
 					}
@@ -138,7 +153,6 @@
 				$("#bundlesPartner").html("");
 				$("#bundlesUser").html("");
 				$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
-
 				$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name'>");
 				$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
 			};
@@ -146,33 +160,104 @@
 
 			let instanceBundle;
 			window.addBundle = function addBundle() {
-				$("#bundlesPartner").html("");
-				$("#bundlesUser").html("");
-				$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
-
 				let bundle = partnerBundles.find(function(bundle) {
 					return bundle.id === event.srcElement.value;
 				});
-				console.log("bundle2", bundle);
+				console.log("bundle template", bundle);
+				$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
+				let wizardOutput = [[
+							// "5e4d3f17c31c0dfd424d6665",
+							{
+								"endpoint" : "",
+								"_id" : ""
+							}
+							// [{
+							// 	"endpoint" : "philips-hue.5e4d3dfac31c0dfd424d6647",
+							// 	"_id" : "5e4d3dfac31c0dfd424d6647"
+							// }]
+						]];
 				let instantiateBundle = {
-					url: baseUrl + '/api/v2/bundleInstances',
+					url: baseUrl + '/api/v2/bundles/validate',
 					method: 'POST',
 					headers: {'Authorization': 'Bearer ' + token},
 					data: {
-						wizardOutput: {},
+						wizardOutput: wizardOutput,
 						bundleTemplateId: event.srcElement.value,
 						name: $('#nameInput').val()
 					}
 				}
-				console.log("Ins bundle", instantiateBundle);
-				console.log("call result", $.ajax(instantiateBundle));
-				// bundle.getInstance().then(function(returnedInstance) {
-				// 	instanceBundle = returnedInstance;
-				// 	$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + instanceBundle.name.en + "<br/><br/>");
-				// 	$("#continueButton").html("<br/><button onclick='pickUnits()'>Continue</button>");
-				// 	displayRequiredChannels();
-				// });
+				
+				//try to connect all channels as if they were plain 
+				bundle.usedChannels.forEach( channel => {
+					$.ajax({
+						url: baseUrl + '/api/v1/channelaccounts',
+						method: 'POST',
+						headers: {
+							'Authorization': 'Bearer ' + token,
+							'Content-Type': "application/x-www-form-urlencoded",
+						},
+						data: {'channel': channel}
+					})
+				});
+
+				$("#requiredChannels").html("<b>The following channels need to be connected:</b><br/>");
+				
+
+				let reqs = bundle.wizardPages[0].wizardEditors;
+				console.log("reqs", reqs);
+				
+				$.ajax(instantiateBundle).then(result => {
+					console.log("result", result);
+					if (result.valid === true) {
+						//display information about the bundle and make continue a save button
+					}
+					if (result.missingSteps.channelsToConnect.length > 0) {
+						$.ajax({
+								url: baseUrl + '/api/v1/accessControl/proxy/channel/' + {channelId} + '/ops/signin',
+								method: 'GET',
+								data: {'bearerToken': token}
+							})							
+						}
+					else if (result.missingSteps.addUnits.length > 0) {
+							//should I check if they connected or just ask to refresh the page
+					} else if (result.missingSteps.provideInputs.length > 0) {
+						addMissingInput(reqs);
+					}
+				}).catch(handleError);
+				$("#continueButton").html("<br/><button onclick='pickUnits()'>Continue</button>");
 			};
+
+			function addMissingInput(reqs) {
+				reqs.forEach(req => {
+					$("#unitPicker").append("<br/><b>" + req.label.en + "</b>");
+					$.ajax({
+						url: baseUrl + '/api/v1/units',
+						method: 'GET',
+						headers: {'Authorization': 'Bearer ' + token},
+						data: {
+							channel: req.channel,
+	    					type: req.unitType,
+						}
+					}).then(units => {
+						for (let unit of units) {
+							console.log("unit", unit);
+							$("#unitPicker").append("<div id='total" + unit._id + "'>" + unit.name + " <button id='" + unit._id + "'>Pick</button>" + "</div>");
+							$("#" + unit._id).click(function() {
+								console.log('wiz values', Object.values(wizardOutput[0][0]));								
+								// if (Object.values(wizardOutput[0][0]).every( value => { value === "";})) {
+								// 	wizardOutput.pop;
+								// 	console.log('popping');
+								// }
+								wizardOutput.push([{
+									_id: unit._id,
+									endpoint: unit.endpoint
+								}]);
+								console.log(wizardOutput);
+								$("#total" + unit._id).html("<b>" + unit.name + " - picked</b>");
+							})}
+					}).catch(handleError);
+				});
+			}
 
 			window.displayRequiredChannels = function displayRequiredChannels() {
 				$("#requiredChannels").html("<b>Requiring channels:</b><br/>");
@@ -295,12 +380,6 @@
 				}).catch(handleError);
 			};
 
-			window.connectChannel = function connectChannel() {
-				api.openInitChannel(event.srcElement.value, function() {
-					displayRequiredChannels();
-				});
-			};
-
 			window.returnToOverview = function returnToOverview() {
 				displayBundlesPartner();
 				displayBundlesUser();
@@ -312,9 +391,8 @@
 				$("#continueButton").html("");
 			};
 
-			// TODO - This should not be hardcoded and will be a part of the SDK.
 			window.getFullImgURL = function getFullImgURL(id) {
-				return 'https:/connect-kpn.olisto.com/api/v1/files/' + id;
+				return baseUrl + '/api/v1/files/' + id;
 			};
 
 			function handleError(error) {
