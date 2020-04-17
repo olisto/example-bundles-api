@@ -169,6 +169,7 @@
 			}
 
 			function checkChannelsAndUnits(bundleToValidate) {
+				console.log("bundletp", bundleToValidate);
 				$.ajax(bundleToValidate).then(result => {
 					console.log("validation", result);
 					if (result.valid === true) {
@@ -187,7 +188,7 @@
 						$("#continueButton").html("<br/><button onclick='returnToOverview()'>Refresh</button>");
 					} //else
 					if (result.missingSteps.provideInputs.length > 0) {
-						addMissingInput(result.missingSteps.provideInputs);
+						addMissingInput(result.missingSteps.provideInputs[5]);
 						$("#continueButton").html("<br/><button onclick='validate()'>Continue</button>");
 					}
 					//what if none of these happens? 
@@ -231,35 +232,74 @@
 				//display "Please refresh when you're done connecting"
 			};
 
-			function addMissingInput(inputs) {
-				inputs.forEach(input => {
-					if (input.errCode === 'missing_unit'){
-						$("#unitPicker").append("<br/><b>Pick which " + input.type.unitType + " to use:</b>");
-						let path = input.path;
-						$.ajax({
-							url: baseUrl + '/api/v1/units',
-							method: 'GET',
-							headers: {'Authorization': 'Bearer ' + token},
-							data: {
-								channel: input.type.channel,
-								type: input.type.unitType,
+			function addMissingInput(input) {
+				if (input.errCode === 'missing_unit'){
+					$("#unitPicker").append("<br/><b>Pick which " + input.type.unitType + " to use:</b>");
+					let path = input.path;
+					$.ajax({
+						url: baseUrl + '/api/v1/units',
+						method: 'GET',
+						headers: {'Authorization': 'Bearer ' + token},
+						data: {
+							channel: input.type.channel,
+							type: input.type.unitType,
+						}
+					}).then(units => {
+						console.log("units", units);
+						for (let unit of units) {
+							if (input.type.isMulti === true) {
+								$("#unitPicker").append("<div> <input type='checkbox' name='" + path + 
+								"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div");	
+								$("#continueButton").html("<br/><button onclick='submitMultiUnits(" + path + ")'>Continue</button>")
+							} else {
+								$("#unitPicker").append("<div> <input type='radio' name='" + path + 
+								"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div");
+								$("#continueButton").html("<br/><button onclick='submitUnit(" + path + ")'>Continue</button>")
 							}
-						}).then(units => {
-							for (let unit of units) {
-								//console.log("unit", unit);
-								$("#unitPicker").append("<div id='total" + unit._id + "'>" + unit.name + " <button id='" + unit._id + "'>Pick</button>" + "</div>");
-								$("#" + unit._id).click(function() {
-									parameters[path] = {
-										_id: unit._id,
-										endpoint: unit.endpoint
-									};
-									$("#total" + unit._id).html("<b>" + unit.name + " - picked</b>");
-								})}
-						}).catch(handleError);
-					}
+						}
+					}).catch(handleError);
+				} else if (input.errCode === 'missing_value'){
+					//code for missing value
+				}
+			}
+			window.submitUnit = function submitUnit(path) {
+				if ($("input:radio[name='" + path + "']:checked").length != 1) {
+					alert("You need to choose a unit.");
+				 	return;
+				}
 
-					
+				parameters[path] = {};
+				$("input:radio[name='" + path + "']:checked").each(function(i,v){
+					parameters[path]._id = $(v).attr('id'),
+					parameters[path].endpoint = $(this).val()
 				});
+				$("input:radio[name='" + path + "']").each(function(){
+					$(this).prop("disabled", true);
+				});
+				console.log("params", parameters);
+				bundleToValidate.data.parameters = parameters;
+				checkChannelsAndUnits(bundleToValidate);
+			}
+
+			window.submitMultiUnits = function submitMultiUnits(path) {
+				if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
+					alert("Choose at least one unit above.");
+				 	return;
+				}
+
+				parameters[path] = [];
+				$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
+					parameters[path].push({
+						_id: $(v).attr('id'),
+						endpoint: $(this).val()
+					});
+				});
+				$("input:checkbox[name='" + path + "']").each(function(){
+					$(this).prop("disabled", true);
+				});
+				console.log("params", parameters);
+				bundleToValidate.data.parameters = parameters;
+				checkChannelsAndUnits(bundleToValidate);
 			}
 
 			window.saveBundle = function saveBundle() {
