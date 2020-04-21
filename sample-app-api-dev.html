@@ -268,6 +268,7 @@
 			};
 
 			function addMissingInput(input) {
+				path = input.path;
 				if (input.errCode === 'missing_unit'){
 					$("#unitPicker").append("<br/><b>Pick which " + input.type.unitType + " to use:</b>");
 					$.ajax({
