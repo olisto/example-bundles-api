@@ -167,21 +167,15 @@
 				$.ajax(validateBundleCall).then(result => {
 					console.log("validation results", result);
 					if (result.valid === true) {
-						//display information about the bundle and make continue a save button
 						$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
 					} else if (result.missingSteps.channelsToConnect.length > 0) {
 						displayRequiredChannels(result.missingSteps.channelsToConnect);
 					} else if (result.missingSteps.addUnits.length > 0) {
 						handleMissingUnits(result.missingSteps.addUnits);
-						// result.missingSteps.addUnits.forEach(unit => {
-						// $("#requiredUnits").append("<br/><span style=\"color:red\"> Currently, you do not have any units of type <b>" + unit.type +
-						// 		 "</b> in channel <b>" + unit.channel + "</b>. Please add units in the app and refresh this bundle creator.</span>");
-						// });
-						// $("#continueButton").html("<br/><button onclick='returnToOverview()'>Refresh</button>");
 					}  else if (result.missingSteps.provideInputs.length > 0) {
 						addMissingInput(result.missingSteps.provideInputs[0]);
 					} else {
-						$("#continueButton").html("Unknown error, choose a different bundle template.");
+						$("#continueButton").html("This app does not handle this, choose a different bundle template.");
 					} 
 				}).catch(handleError);
 			}
@@ -267,16 +261,13 @@
 						},
 						data: JSON.stringify(newUnit)
 					}).then(res => {
-						console.log('res', res);
 						$("#addUnits").html("");
 						checkChannelsAndUnits();
 					}).catch(handleError);
 				})
 			};
 
-
 			function addMissingInput(input) {
-				let path = input.path;
 				if (input.errCode === 'missing_unit'){
 					$("#unitPicker").append("<br/><b>Pick which " + input.type.unitType + " to use:</b>");
 					$.ajax({
@@ -288,7 +279,6 @@
 							type: input.type.unitType,
 						}
 					}).then(units => {
-						console.log("units", units);
 						for (let unit of units) {
 							if (input.type.isMulti === true) {
 								$("#unitPicker").append("<div> <input type='checkbox' name='" + path + 
@@ -306,8 +296,8 @@
 					$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
 					$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
 				} else {
-					$("#unitPicker").append("<br/><b> Cannot deal with the missing unit.<b>");
-					//add what unit
+					$("#unitPicker").append("<br/><b> Cannot deal with the missing input type.<b>");
+					//add more specific information maybe
 				}
 			}
 
@@ -356,13 +346,9 @@
 				});
 				validateBundleCall.data.parameters = parameters;
 				checkChannelsAndUnits();
-			}
+			};
 
 			window.saveBundle = function saveBundle() {
-				// if ($('#nameInput').val() === "") {
-				// 	alert('Name bundle first');
-				// 	return;
-				// }
 				saveBundleCall = validateBundleCall;
 				saveBundleCall.url = baseUrl + "/api/v2/bundleInstances";
 				console.log(saveBundleCall);
@@ -456,6 +442,8 @@
 		Overall comments: 
 			- <br/> policy is very unclear, would be nice if it was consistent 
 			- functions are messy, some rely on global variables, some on passing them, it's not clear why 
+			- order is not always clear
+			- when you pick units like buttons, it would be good to have an option of adding one (will deal with it if I've got time left on Thursday)
 			...
 		*/
 	</script>
