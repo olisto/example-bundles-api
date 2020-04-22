@@ -116,7 +116,7 @@
 
 			//Retrieve bundle templates
 			$.ajax({
-				url: baseUrl + '/api/v2/bundles/browse',
+				url: baseUrl + '/api/v2/bundleTemplates',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token},
 				data: {'showOnlyPartner': 1}	
