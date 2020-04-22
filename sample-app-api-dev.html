@@ -63,7 +63,7 @@
 
 		function loginTriggiDev() {
 			$.ajax({
-					url: baseUrl + '/api/v1/user/account',
+					url: baseUrl + '/api/v1/user/account?response_type=bearer',
 					method: 'POST',
 					data: {
 						partnerKey: '7ze1d587238s7524f73k3333',
