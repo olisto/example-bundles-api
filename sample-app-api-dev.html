@@ -86,6 +86,7 @@
 
 		function demoForContext() {
 			let partnerBundles = [];
+			let selectedBundle;
 			let userBundles = [];
 			let channelDescriptions;
 			let validateBundleCall;
@@ -130,6 +131,11 @@
 				userBundles = resultUserBundles;
 				displayBundlesUser(userBundles);
 			}).catch(handleError);
+
+			window.selectBundle = function(bundleId) {
+				selectedBundle = partnerBundles.find(bundle => bundle._id === bundleId);
+				nameBundle();
+			};
 
 			window.nameBundle = function nameBundle() {
 				$("#bundlesPartner").html("");
@@ -270,7 +276,7 @@
 			function addMissingInput(input) {
 				path = input.path;
 				if (input.errCode === 'missing_unit'){
-					$("#unitPicker").append("<br/><b>Pick which " + input.type.unitType + " to use:</b>");
+					$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
 					$.ajax({
 						url: baseUrl + '/api/v1/units',
 						method: 'GET',
@@ -432,7 +438,7 @@
 					"<div id='bundle'>" +
 					"<img src='" + getFullImgURL(bundle.images.header) + "' height='42' width='84'>" +
 					bundle.name.en +
-					" <button value='" + bundle.id + "' onclick='nameBundle()'>Add</button>" +
+					" <button value='" + bundle.id + "' onclick='selectBundle(\""+bundle.id+"\")'>Add</button>" +
 					"</div>"
 				);
 			}
