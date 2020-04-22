@@ -145,7 +145,7 @@
 					return bundle.id === event.srcElement.value;
 				});
 				$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
-				$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name'>");
+				$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name' value='" + bundle.name.en + "'>");
 				$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
 				$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
 			};
