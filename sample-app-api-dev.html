@@ -169,6 +169,10 @@
 				checkChannelsAndUnits();
 			};
 
+			function unAddable(missingUnit) {
+				return !getUnitTypeDescription(missingUnit.channel, missingUnit.type).allowAdding;
+			}
+
 			function checkChannelsAndUnits() {
 				$.ajax(validateBundleCall).then(result => {
 					console.log("validation results", result);
@@ -176,7 +180,7 @@
 						$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
 					} else if (result.missingSteps.channelsToConnect.length > 0) {
 						displayRequiredChannels(result.missingSteps.channelsToConnect);
-					} else if (result.missingSteps.addUnits.length > 0) {
+					} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
 						handleMissingUnits(result.missingSteps.addUnits);
 					}  else if (result.missingSteps.provideInputs.length > 0) {
 						addMissingInput(result.missingSteps.provideInputs[0]);
@@ -231,51 +235,64 @@
 				//Room for improvement: refresh the list after user comes back to the page/set a timer
 			};
 
+			function getUnitTypeDescription(channelId, unitType) {
+				const channelDescription = channelDescriptions[channelId];
+				const unitTypeDescription = channelDescription && channelDescription.unitTypes.find(type => type.id === unitType);
+				if (!unitTypeDescription) {
+					console.warn('unit of unknown channel/type requested: ' + channelId + '/' + unitType);
+					return;
+				}
+				return unitTypeDescription;
+			}
+
 			function handleMissingUnits(missingUnits) {
 				$("#addUnits").html("<br/><b>The following units need to be added:</b><br/>");
 				missingUnits.forEach(missingUnit => {
-					if (channelDescriptions[missingUnit.channel]) {
-						channelDescriptions[missingUnit.channel].unitTypes.forEach(unitType => {
-							if (unitType.id == missingUnit.type) {
-								if (unitType.allowAdding) {
-									$("#addUnits").append("<span id='" + missingUnit.type + "'> " + missingUnit.type + " " +
-										'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
-										"</span><br/>"
-									);
-								} else {
-									$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " +missingUnit.type+ " for the channel " + missingUnit.channel +
-										"</span><br/>"
-									);
-									$("#continueButton").html("<br/>");
-								}
-							}
-						});
+					const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
+					if (unitTypeDescription.allowAdding) {
+						return;
+						// Dont need this if we only show missing units that are not addable
+						$("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
+							'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
+							"</span><br/>"
+						);
+					} else {
+						$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " +missingUnit.type+ " for the channel " + missingUnit.channel +
+							"</span><br/>"
+						);
+						$("#continueButton").html("<br/>");
 					}
 				});
 			}
 
+			function createUnit(channel, type, name) {
+				let newUnit = {channel: channel, type: type, name: name};
+				return $.ajax({
+					url: baseUrl + '/channel/' + channel + '/units',
+					method: 'POST',
+					headers: {
+						'Authorization': 'Bearer ' + token,
+						'Content-Type': "application/json",
+					},
+					data: JSON.stringify(newUnit)
+				});
+			}
+
+			//TODO: Dont need this if we only show missing units that are not addable
 			window.addUnit = function addUnit(channel, type) {
 				$("#addUnits").append("<br/>Unit name <input type='text' id='unitName' placeholder='name'><button id='addUnitButton'>Add unit</button>");
-				$("#addUnitButton").click(function() {
-					let newUnit = {channel: channel, type: type, name: $('#unitName').val()};
-					$.ajax({
-						url: baseUrl + '/channel/' + channel + '/units',
-						method: 'POST',
-						headers: {
-							'Authorization': 'Bearer ' + token,
-							'Content-Type': "application/json",
-						},
-						data: JSON.stringify(newUnit)
-					}).then(res => {
-						$("#addUnits").html("");
-						checkChannelsAndUnits();
-					}).catch(handleError);
-				})
+				$("#addUnitButton").click(() => {
+					createUnit(channel, type, $('#unitName').val());
+				}).then(res => {
+					$("#addUnits").html("");
+					checkChannelsAndUnits();
+				}).catch(handleError);
 			};
 
 			function addMissingInput(input) {
 				path = input.path;
-				if (input.errCode === 'missing_unit'){
+				if (input.errCode === 'missing_unit') {
+					$("#unitPicker").html('');
 					$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
 					$.ajax({
 						url: baseUrl + '/api/v1/units',
@@ -286,17 +303,19 @@
 							type: input.type.unitType,
 						}
 					}).then(units => {
+						const isMulti = input.type.isMulti === true;
 						for (let unit of units) {
-							if (input.type.isMulti === true) {
-								$("#unitPicker").append("<div> <input type='checkbox' name='" + path + 
-								"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");	
-								$("#continueButton").html("<br/><button onclick=\"submitMultiUnits('" + path + "')\">Continue</button>")
-							} else {
-								$("#unitPicker").append("<div> <input type='radio' name='" + path + 
-								"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
-								$("#continueButton").html("<br/><button onclick=\"submitUnit('" + path + "')\">Continue</button>");
-							}
+							$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+							"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 						}
+						$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
+						const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
+						$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+						$("#newUnitButton").click(() => {
+							createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
+								addMissingInput(input);
+							});
+						});
 					}).catch(handleError);
 				} else if (input.errCode === 'missing_value'){
 					$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
