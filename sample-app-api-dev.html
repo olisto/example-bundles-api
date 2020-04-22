@@ -194,13 +194,14 @@
 				$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
 				channelsToConnect.forEach((channel) => {
 					const channelId = channel['channelId'];
+					const channelName = channelDescriptions[channelId].channelInfo.title.en;
 					if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
-						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelId + " " +
+						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
 							"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
 							"</span><br/>"
 						);
 					} else {
-						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelId + " " +
+						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
 							"<button value='" + channelId + "' onclick='connectExternalChannel()'>Connect</button>" +
 							"</span><br/>"
 						);
