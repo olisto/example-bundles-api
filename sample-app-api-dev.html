@@ -34,376 +34,351 @@
 	<script>
 		var baseUrl = 'https://connect-kpn.olisto.com'; 
 		let token;
-		
-		function loginKpnId() {
-			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
-			window.open(baseUrl + '/kpn/auth?session=' + sessionId, '_blank');
-			var intervalHandle = setInterval(function() {
-				$.ajax({
-					url: baseUrl + '/kpn/loginSession/' + sessionId + '?response_type=bearer',
-					method: 'GET',
-				}).then(function(result) {
-					if (result.token) {
-						token = result.token;
-						clearInterval(intervalHandle);
-						displayOverview();
-					}
-				}).catch(function(result) {
-					//404 is expected while in progress. Anything else is a real error
-					if (result.status !== 404) {
-						clearInterval(intervalHandle);
-						throw new Error('Cannot log in');
-					}
-				});
+		let partnerBundles = [];
+		let selectedBundle;
+		let userBundles = [];
+		let channelDescriptions;
+		let validateBundleCall;
+		let parameters = {};
 
-			}, 1000);
+		function displayOverview() { 
+			cleanPage();
+			$.ajax({
+				url: baseUrl + '/api/v1/channel/descriptions',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: {"includeConnections": 1}
+			}).then(descriptions => {
+				channelDescriptions = descriptions;
+			}).catch(handleError);
+
+			let retrieveUserBundlesCall = {
+				url: baseUrl + '/api/v2/bundleInstances',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token}
+			};
+
+			//Retrieve bundle templates
+			$.ajax({
+				url: baseUrl + '/api/v2/bundleTemplates',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: {'showOnlyPartner': 1}	
+			}).then(function(resultPartnerBundles) {
+				partnerBundles = resultPartnerBundles;
+				displayBundlesPartner(partnerBundles);
+
+				//Retrieve current bundles - maybe this can be put in a separate functions bc it's repeated later on
+				return $.ajax(retrieveUserBundlesCall);
+			}).then(resultUserBundles => {
+				userBundles = resultUserBundles;
+				displayBundlesUser(userBundles);
+			}).catch(handleError);
 		}
 
-			let partnerBundles = [];
-			let selectedBundle;
-			let userBundles = [];
-			let channelDescriptions;
-			let validateBundleCall;
-			let parameters = {};
+		function selectBundle(bundleId) {
+			selectedBundle = partnerBundles.find(bundle => bundle._id === bundleId);
+			nameBundle();
+		};
 
-			function displayOverview() { 
-				cleanPage();
-				$.ajax({
-					url: baseUrl + '/api/v1/channel/descriptions',
-					method: 'GET',
-					headers: {'Authorization': 'Bearer ' + token},
-					data: {"includeConnections": 1}
-				}).then(descriptions => {
-					channelDescriptions = descriptions;
-				}).catch(handleError);
+		function nameBundle() {
+			$("#bundlesPartner").html("");
+			$("#bundlesUser").html("");
 
-				let retrieveUserBundlesCall = {
-					url: baseUrl + '/api/v2/bundleInstances',
-					method: 'GET',
-					headers: {'Authorization': 'Bearer ' + token}
-				};
+			let bundle = partnerBundles.find(function(bundle) {
+				return bundle.id === event.srcElement.value;
+			});
+			$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
+			$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name' value='" + bundle.name.en + "'>");
+			$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
+			$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
+		};
 
-				//Retrieve bundle templates
-				$.ajax({
-					url: baseUrl + '/api/v2/bundleTemplates',
-					method: 'GET',
-					headers: {'Authorization': 'Bearer ' + token},
-					data: {'showOnlyPartner': 1}	
-				}).then(function(resultPartnerBundles) {
-					partnerBundles = resultPartnerBundles;
-					displayBundlesPartner(partnerBundles);
-
-					//Retrieve current bundles - maybe this can be put in a separate functions bc it's repeated later on
-					return $.ajax(retrieveUserBundlesCall);
-				}).then(resultUserBundles => {
-					userBundles = resultUserBundles;
-					displayBundlesUser(userBundles);
-				}).catch(handleError);
+		function addBundle() {
+			if ($('#nameInput').val() === "") {
+				alert('You need to choose the bundle name');
+				return;
 			}
-
-			window.selectBundle = function(bundleId) {
-				selectedBundle = partnerBundles.find(bundle => bundle._id === bundleId);
-				nameBundle();
-			};
-
-			window.nameBundle = function nameBundle() {
-				$("#bundlesPartner").html("");
-				$("#bundlesUser").html("");
-
-				let bundle = partnerBundles.find(function(bundle) {
-					return bundle.id === event.srcElement.value;
-				});
-				$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
-				$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name' value='" + bundle.name.en + "'>");
-				$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
-				$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
-			};
-
-			window.addBundle = function addBundle() {
-				if ($('#nameInput').val() === "") {
-					alert('You need to choose the bundle name');
-					return;
+			validateBundleCall = {
+				url: baseUrl + '/api/v2/bundles/validate',
+				method: 'POST',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: {
+					parameters: JSON.stringify(parameters),
+					bundleTemplateId: event.srcElement.value,
+					name: $('#nameInput').val()
 				}
-				validateBundleCall = {
-					url: baseUrl + '/api/v2/bundles/validate',
-					method: 'POST',
+			}
+			$("#nameInputHolder").html("<br/><b>Chosen bundle name: </b><br/>" + $('#nameInput').val());
+			checkChannelsAndUnits();
+		};
+
+		function unAddable(missingUnit) {
+			return !getUnitTypeDescription(missingUnit.channel, missingUnit.type).allowAdding;
+		}
+
+		function checkChannelsAndUnits() {
+			$.ajax(validateBundleCall).then(result => {
+				console.log("validation results", result);
+				if (result.valid === true) {
+					$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
+				} else if (result.missingSteps.channelsToConnect.length > 0) {
+					displayRequiredChannels(result.missingSteps.channelsToConnect);
+				} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
+					handleMissingUnits(result.missingSteps.addUnits);
+				}  else if (result.missingSteps.provideInputs.length > 0) {
+					addMissingInput(result.missingSteps.provideInputs[0]);
+				} else {
+					$("#continueButton").html("This app does not handle this, choose a different bundle template.");
+				} 
+			}).catch(handleError);
+		}
+
+		function displayRequiredChannels(channelsToConnect) {
+			$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
+			channelsToConnect.forEach((channel) => {
+				const channelId = channel['channelId'];
+				const channelName = channelDescriptions[channelId].channelInfo.title.en;
+				if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
+					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
+						"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
+						"</span><br/>"
+					);
+				} else {
+					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
+						"<button value='" + channelId + "' onclick='connectExternalChannel()'>Connect</button>" +
+						"</span><br/>"
+					);
+				}
+			});
+		};
+
+		function connectPlainChannel() {
+			$.ajax({
+				url: baseUrl + '/api/v1/channelaccounts',
+				method: 'POST',
+				headers: {
+					'Authorization': 'Bearer ' + token,
+					'Content-Type': "application/x-www-form-urlencoded",
+				},
+				data: {'channel': event.srcElement.value}
+			}).then(res => {
+				$("#requiredChannels").html("");
+				checkChannelsAndUnits();
+			});
+		};
+
+		function connectExternalChannel() {
+			let url = baseUrl + '/api/v1/accessControl/proxy/channel/' + event.srcElement.value + '/ops/signin?bearerToken=' + token;
+			window.open(url, 'Olisto', 'width=520,height=780,top=' + (screen.height - 400) + ',left=' + (screen.width - 840));
+			$("#requiredChannels").append("<br/> Please click refresh after you connect the channel(s) to Olisto.");
+			$("#continueButton").html("<br/><button id='refreshChannels'>Refresh</button>");
+			$("#refreshChannels").click(function() {
+				$("#requiredChannels").html("");
+				checkChannelsAndUnits();
+			})
+			//Room for improvement: refresh the list after user comes back to the page/set a timer
+		};
+
+		function getUnitTypeDescription(channelId, unitType) {
+			const channelDescription = channelDescriptions[channelId];
+			const unitTypeDescription = channelDescription && channelDescription.unitTypes.find(type => type.id === unitType);
+			if (!unitTypeDescription) {
+				console.warn('unit of unknown channel/type requested: ' + channelId + '/' + unitType);
+				return;
+			}
+			return unitTypeDescription;
+		}
+
+		function handleMissingUnits(missingUnits) {
+			$("#addUnits").html("<br/><b>The following units need to be added:</b><br/>");
+			missingUnits.forEach(missingUnit => {
+				const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
+				if (unitTypeDescription.allowAdding) {
+					return;
+					// Dont need this if we only show missing units that are not addable
+					$("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
+						'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
+						"</span><br/>"
+					);
+				} else {
+					$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " +missingUnit.type+ " for the channel " + missingUnit.channel +
+						"</span><br/>"
+					);
+					$("#continueButton").html("<br/>");
+				}
+			});
+		}
+
+		function createUnit(channel, type, name) {
+			let newUnit = {channel: channel, type: type, name: name};
+			return $.ajax({
+				url: baseUrl + '/channel/' + channel + '/units',
+				method: 'POST',
+				headers: {
+					'Authorization': 'Bearer ' + token,
+					'Content-Type': "application/json",
+				},
+				data: JSON.stringify(newUnit)
+			});
+		}
+
+		//TODO: Dont need this if we only show missing units that are not addable
+		function addUnit(channel, type) {
+			$("#addUnits").append("<br/>Unit name <input type='text' id='unitName' placeholder='name'><button id='addUnitButton'>Add unit</button>");
+			$("#addUnitButton").click(() => {
+				createUnit(channel, type, $('#unitName').val());
+			}).then(res => {
+				$("#addUnits").html("");
+				checkChannelsAndUnits();
+			}).catch(handleError);
+		};
+
+		function addMissingInput(input) {
+			path = input.path;
+			if (input.errCode === 'missing_unit') {
+				$("#unitPicker").html('');
+				$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
+				$.ajax({
+					url: baseUrl + '/api/v1/units',
+					method: 'GET',
 					headers: {'Authorization': 'Bearer ' + token},
 					data: {
-						parameters: JSON.stringify(parameters),
-						bundleTemplateId: event.srcElement.value,
-						name: $('#nameInput').val()
+						channel: input.type.channel,
+						type: input.type.unitType,
 					}
-				}
-				$("#nameInputHolder").html("<br/><b>Chosen bundle name: </b><br/>" + $('#nameInput').val());
-				checkChannelsAndUnits();
-			};
-
-			function unAddable(missingUnit) {
-				return !getUnitTypeDescription(missingUnit.channel, missingUnit.type).allowAdding;
-			}
-
-			function checkChannelsAndUnits() {
-				$.ajax(validateBundleCall).then(result => {
-					console.log("validation results", result);
-					if (result.valid === true) {
-						$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
-					} else if (result.missingSteps.channelsToConnect.length > 0) {
-						displayRequiredChannels(result.missingSteps.channelsToConnect);
-					} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
-						handleMissingUnits(result.missingSteps.addUnits);
-					}  else if (result.missingSteps.provideInputs.length > 0) {
-						addMissingInput(result.missingSteps.provideInputs[0]);
-					} else {
-						$("#continueButton").html("This app does not handle this, choose a different bundle template.");
-					} 
-				}).catch(handleError);
-			}
-
-			function displayRequiredChannels(channelsToConnect) {
-				$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
-				channelsToConnect.forEach((channel) => {
-					const channelId = channel['channelId'];
-					const channelName = channelDescriptions[channelId].channelInfo.title.en;
-					if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
-						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
-							"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
-							"</span><br/>"
-						);
-					} else {
-						$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
-							"<button value='" + channelId + "' onclick='connectExternalChannel()'>Connect</button>" +
-							"</span><br/>"
-						);
+				}).then(units => {
+					const isMulti = input.type.isMulti === true;
+					for (let unit of units) {
+						$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 					}
-				});
-			};
-
-			window.connectPlainChannel = function connectPlainChannel() {
-				$.ajax({
-					url: baseUrl + '/api/v1/channelaccounts',
-					method: 'POST',
-					headers: {
-						'Authorization': 'Bearer ' + token,
-						'Content-Type': "application/x-www-form-urlencoded",
-					},
-					data: {'channel': event.srcElement.value}
-				}).then(res => {
-					$("#requiredChannels").html("");
-					checkChannelsAndUnits();
-				});
-			};
-
-			window.connectExternalChannel = function connectExternalChannel() {
-				let url = baseUrl + '/api/v1/accessControl/proxy/channel/' + event.srcElement.value + '/ops/signin?bearerToken=' + token;
-				window.open(url, 'Olisto', 'width=520,height=780,top=' + (screen.height - 400) + ',left=' + (screen.width - 840));
-				$("#requiredChannels").append("<br/> Please click refresh after you connect the channel(s) to Olisto.");
-				$("#continueButton").html("<br/><button id='refreshChannels'>Refresh</button>");
-				$("#refreshChannels").click(function() {
-					$("#requiredChannels").html("");
-					checkChannelsAndUnits();
-				})
-				//Room for improvement: refresh the list after user comes back to the page/set a timer
-			};
-
-			function getUnitTypeDescription(channelId, unitType) {
-				const channelDescription = channelDescriptions[channelId];
-				const unitTypeDescription = channelDescription && channelDescription.unitTypes.find(type => type.id === unitType);
-				if (!unitTypeDescription) {
-					console.warn('unit of unknown channel/type requested: ' + channelId + '/' + unitType);
-					return;
-				}
-				return unitTypeDescription;
-			}
-
-			function handleMissingUnits(missingUnits) {
-				$("#addUnits").html("<br/><b>The following units need to be added:</b><br/>");
-				missingUnits.forEach(missingUnit => {
-					const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
-					if (unitTypeDescription.allowAdding) {
-						return;
-						// Dont need this if we only show missing units that are not addable
-						$("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
-							'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
-							"</span><br/>"
-						);
-					} else {
-						$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " +missingUnit.type+ " for the channel " + missingUnit.channel +
-							"</span><br/>"
-						);
-						$("#continueButton").html("<br/>");
-					}
-				});
-			}
-
-			function createUnit(channel, type, name) {
-				let newUnit = {channel: channel, type: type, name: name};
-				return $.ajax({
-					url: baseUrl + '/channel/' + channel + '/units',
-					method: 'POST',
-					headers: {
-						'Authorization': 'Bearer ' + token,
-						'Content-Type': "application/json",
-					},
-					data: JSON.stringify(newUnit)
-				});
-			}
-
-			//TODO: Dont need this if we only show missing units that are not addable
-			window.addUnit = function addUnit(channel, type) {
-				$("#addUnits").append("<br/>Unit name <input type='text' id='unitName' placeholder='name'><button id='addUnitButton'>Add unit</button>");
-				$("#addUnitButton").click(() => {
-					createUnit(channel, type, $('#unitName').val());
-				}).then(res => {
-					$("#addUnits").html("");
-					checkChannelsAndUnits();
-				}).catch(handleError);
-			};
-
-			function addMissingInput(input) {
-				path = input.path;
-				if (input.errCode === 'missing_unit') {
-					$("#unitPicker").html('');
-					$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
-					$.ajax({
-						url: baseUrl + '/api/v1/units',
-						method: 'GET',
-						headers: {'Authorization': 'Bearer ' + token},
-						data: {
-							channel: input.type.channel,
-							type: input.type.unitType,
-						}
-					}).then(units => {
-						const isMulti = input.type.isMulti === true;
-						for (let unit of units) {
-							$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
-							"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
-						}
-						$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
-						const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
-						$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
-						$("#newUnitButton").click(() => {
-							createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
-								addMissingInput(input);
-							});
+					$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
+					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
+					$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+					$("#newUnitButton").click(() => {
+						createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
+							addMissingInput(input);
 						});
-					}).catch(handleError);
-				} else if (input.errCode === 'missing_value'){
-					$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
-					$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
-					$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
-				} else {
-					$("#unitPicker").append("<br/><b> Cannot deal with the missing input type.<b>");
-					//add more specific information maybe
-				}
-			}
-
-			window.submitValue = function submitValue(path) {
-				if ($("input:text[name='" + path + "']").val() === "") {
-					alert('Please provide a value.');
-					return;
-				}
-				parameters[path] = $("input:text[name='" + path + "']").val();
-				$("input:text[name='" + path + "']").prop("disabled", true).css("background-color", "lightgray");
-				validateBundleCall.data.parameters = parameters;
-				checkChannelsAndUnits();
-			}
-
-			window.submitUnit = function submitUnit(path) {
-				if ($("input:radio[name='" + path + "']:checked").length != 1) {
-					alert("You need to choose a unit.");
-				 	return;
-				}
-				parameters[path] = {};
-				$("input:radio[name='" + path + "']:checked").each(function(i,v){
-					parameters[path]._id = $(v).attr('id'),
-					parameters[path].endpoint = $(this).val()
-				});
-				$("input:radio[name='" + path + "']").each(function(){
-					$(this).prop("disabled", true);
-				});
-				validateBundleCall.data.parameters = parameters;
-				checkChannelsAndUnits();
-			}
-
-			window.submitMultiUnits = function submitMultiUnits(path) {
-				if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
-					alert("Choose at least one unit above.");
-				 	return;
-				}
-				parameters[path] = [];
-				$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
-					parameters[path].push({
-						_id: $(v).attr('id'),
-						endpoint: $(this).val()
 					});
-				});
-				$("input:checkbox[name='" + path + "']").each(function(){
-					$(this).prop("disabled", true);
-				});
-				validateBundleCall.data.parameters = parameters;
-				checkChannelsAndUnits();
-			};
+				}).catch(handleError);
+			} else if (input.errCode === 'missing_value'){
+				$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
+				$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
+				$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
+			} else {
+				$("#unitPicker").append("<br/><b> Cannot deal with the missing input type.<b>");
+				//add more specific information maybe
+			}
+		}
 
-			window.saveBundle = function saveBundle() {
-				saveBundleCall = validateBundleCall;
-				saveBundleCall.url = baseUrl + "/api/v2/bundleInstances";
-				console.log(saveBundleCall);
-				$.ajax(saveBundleCall).then(bundleSaved => {
-					console.log("Bundle saved", bundleSaved);
+		function submitValue(path) {
+			if ($("input:text[name='" + path + "']").val() === "") {
+				alert('Please provide a value.');
+				return;
+			}
+			parameters[path] = $("input:text[name='" + path + "']").val();
+			$("input:text[name='" + path + "']").prop("disabled", true).css("background-color", "lightgray");
+			validateBundleCall.data.parameters = parameters;
+			checkChannelsAndUnits();
+		}
+
+		function submitUnit(path) {
+			if ($("input:radio[name='" + path + "']:checked").length != 1) {
+				alert("You need to choose a unit.");
+				return;
+			}
+			parameters[path] = {};
+			$("input:radio[name='" + path + "']:checked").each(function(i,v){
+				parameters[path]._id = $(v).attr('id'),
+				parameters[path].endpoint = $(this).val()
+			});
+			$("input:radio[name='" + path + "']").each(function(){
+				$(this).prop("disabled", true);
+			});
+			validateBundleCall.data.parameters = parameters;
+			checkChannelsAndUnits();
+		}
+
+		function submitMultiUnits(path) {
+			if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
+				alert("Choose at least one unit above.");
+				return;
+			}
+			parameters[path] = [];
+			$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
+				parameters[path].push({
+					_id: $(v).attr('id'),
+					endpoint: $(this).val()
+				});
+			});
+			$("input:checkbox[name='" + path + "']").each(function(){
+				$(this).prop("disabled", true);
+			});
+			validateBundleCall.data.parameters = parameters;
+			checkChannelsAndUnits();
+		};
+
+		function saveBundle() {
+			saveBundleCall = validateBundleCall;
+			saveBundleCall.url = baseUrl + "/api/v2/bundleInstances";
+			console.log(saveBundleCall);
+			$.ajax(saveBundleCall).then(bundleSaved => {
+				console.log("Bundle saved", bundleSaved);
+				return $.ajax({
+				url: baseUrl + '/api/v2/bundleInstances',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token}
+			});
+			}).then(resultUserBundles => {
+				userBundles = resultUserBundles;
+				returnToOverview();
+			}).catch(handleError);
+		};
+
+		function removeBundle() {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundles/' + event.srcElement.value,
+				method: 'DELETE',
+				headers: {'Authorization': 'Bearer ' + token}
+			}).then(() => {
 					return $.ajax({
-					url: baseUrl + '/api/v2/bundleInstances',
-					method: 'GET',
-					headers: {'Authorization': 'Bearer ' + token}
-				});
-				}).then(resultUserBundles => {
-					userBundles = resultUserBundles;
-					returnToOverview();
-				}).catch(handleError);
-			};
+				url: baseUrl + '/api/v2/bundleInstances',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token}
+			});
+			}).then(resultUserBundles => {
+				userBundles = resultUserBundles;
+				returnToOverview();
+			}).catch(handleError);
+		};
 
-			window.removeBundle = function removeBundle() {
-				$.ajax({
-					url: baseUrl + '/api/v2/bundles/' + event.srcElement.value,
-					method: 'DELETE',
-					headers: {'Authorization': 'Bearer ' + token}
-				}).then(() => {
-						return $.ajax({
-					url: baseUrl + '/api/v2/bundleInstances',
-					method: 'GET',
-					headers: {'Authorization': 'Bearer ' + token}
-				});
-				}).then(resultUserBundles => {
-					userBundles = resultUserBundles;
-					returnToOverview();
-				}).catch(handleError);
-			};
+		function returnToOverview() {
+			cleanPage();
+			parameters = {};
+			displayBundlesPartner(partnerBundles);
+			displayBundlesUser(userBundles);
+		}
 
-			window.returnToOverview = function returnToOverview() {
-				cleanPage();
-				parameters = {};
-				displayBundlesPartner(partnerBundles);
-				displayBundlesUser(userBundles);
-			}
+		function cleanPage() {
+			$("#bundleInstantiation").html("");
+			$("#nameInputHolder").html("");
+			$("#requiredChannels").html("");
+			$("#requiredUnits").html("");
+			$("#addUnits").html("");
+			$("#unitPicker").html("");
+			$("#continueButton").html("");
+			$("#cancelButton").html("");
+		}
 
-			function cleanPage() {
-				$("#bundleInstantiation").html("");
-				$("#nameInputHolder").html("");
-				$("#requiredChannels").html("");
-				$("#requiredUnits").html("");
-				$("#addUnits").html("");
-				$("#unitPicker").html("");
-				$("#continueButton").html("");
-				$("#cancelButton").html("");
-			}
+		function getFullImgURL(id) {
+			return baseUrl + '/api/v1/files/' + id;
+		};
 
-			window.getFullImgURL = function getFullImgURL(id) {
-				return baseUrl + '/api/v1/files/' + id;
-			};
-
-			function handleError(error) {
-				console.log(error.toString());
-				console.log(JSON.stringify(error));
-			}
+		function handleError(error) {
+			console.log(error.toString());
+			console.log(JSON.stringify(error));
+		}
 
 		function displayBundlesUser(userBundles) {
 			let bundlesUserDiv = $("#bundlesUser");
@@ -441,6 +416,29 @@
 			bundlesPartnerDiv.append("<br/>");
 		}
 
+		function loginKpnId() {
+			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
+			window.open(baseUrl + '/kpn/auth?session=' + sessionId, '_blank');
+			var intervalHandle = setInterval(function() {
+				$.ajax({
+					url: baseUrl + '/kpn/loginSession/' + sessionId + '?response_type=bearer',
+					method: 'GET',
+				}).then(function(result) {
+					if (result.token) {
+						token = result.token;
+						clearInterval(intervalHandle);
+						displayOverview();
+					}
+				}).catch(function(result) {
+					//404 is expected while in progress. Anything else is a real error
+					if (result.status !== 404) {
+						clearInterval(intervalHandle);
+						throw new Error('Cannot log in');
+					}
+				});
+
+			}, 1000);
+		}
 
 		function loginTriggiDev() {
 			$.ajax({
@@ -465,13 +463,5 @@
 				});
 		}
 
-		/*
-		Overall comments: 
-			- <br/> policy is very unclear, would be nice if it was consistent 
-			- functions are messy, some rely on global variables, some on passing them, it's not clear why 
-			- order is not always clear
-			- when you pick units like buttons, it would be good to have an option of adding one (will deal with it if I've got time left on Thursday)
-			...
-		*/
 	</script>
 </html>
