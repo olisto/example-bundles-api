@@ -38,7 +38,7 @@
 		let selectedBundle;
 		let userBundles = [];
 		let channelDescriptions;
-		let validateBundleCall;
+		let bundleData;
 		let parameters = {};
 
 		function displayOverview() { 
@@ -49,7 +49,12 @@
 		}
 
 		function validateBundle() {
-			$.ajax(validateBundleCall).then(result => {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundles/validate',
+				method: 'POST',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: bundleData
+			}).then(result => {
 				console.log("validation results", result);
 				if (result.valid === true) {
 					$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
@@ -214,7 +219,7 @@
 			}
 			parameters[path] = $("input:text[name='" + path + "']").val();
 			$("input:text[name='" + path + "']").prop("disabled", true).css("background-color", "lightgray");
-			validateBundleCall.data.parameters = parameters;
+			bundleData.parameters = parameters;
 			validateBundle();
 		}
 
@@ -231,7 +236,7 @@
 			$("input:radio[name='" + path + "']").each(function(){
 				$(this).prop("disabled", true);
 			});
-			validateBundleCall.data.parameters = parameters;
+			bundleData.parameters = parameters;
 			validateBundle();
 		}
 
@@ -250,7 +255,7 @@
 			$("input:checkbox[name='" + path + "']").each(function(){
 				$(this).prop("disabled", true);
 			});
-			validateBundleCall.data.parameters = parameters;
+			bundleData.parameters = parameters;
 			validateBundle();
 		}
 
@@ -277,25 +282,22 @@
 				alert('You need to choose the bundle name');
 				return;
 			}
-			validateBundleCall = {
-				url: baseUrl + '/api/v2/bundles/validate',
-				method: 'POST',
-				headers: {'Authorization': 'Bearer ' + token},
-				data: {
-					parameters: JSON.stringify(parameters),
-					bundleTemplateId: event.srcElement.value,
-					name: $('#nameInput').val()
-				}
+			bundleData = {
+				parameters: JSON.stringify(parameters),
+				bundleTemplateId: event.srcElement.value,
+				name: $('#nameInput').val()
 			}
 			$("#nameInputHolder").html("<br/><b>Chosen bundle name: </b><br/>" + $('#nameInput').val());
 			validateBundle();
 		}
 
 		function saveBundle() {
-			saveBundleCall = validateBundleCall;
-			saveBundleCall.url = baseUrl + "/api/v2/bundleInstances";
-			console.log(saveBundleCall);
-			$.ajax(saveBundleCall).then(bundleSaved => {
+			$.ajax({
+				url: baseUrl + "/api/v2/bundleInstances",
+				method: 'POST',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: bundleData
+			}).then(bundleSaved => {
 				console.log("Bundle saved", bundleSaved);
 				return $.ajax({
 				url: baseUrl + '/api/v2/bundleInstances',
