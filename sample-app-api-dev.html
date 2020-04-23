@@ -16,7 +16,7 @@
 		</style>
 
 		<h2>Sample app for bundle validation with APIs</h2>
-		<button onclick="loginTriggiDev()">Login with KPN ID</button>
+		<button onclick="loginKpnId()">Login with KPN ID</button>
 
 		<div id="bundlesPartner"></div>
 		<div id="bundlesUser"></div>
@@ -32,10 +32,8 @@
 	</body>
 
 	<script>
-		var baseUrl = 'https://connect-dev.olisto.com'; //once it's pushed, change to connect-kpn
+		var baseUrl = 'https://connect-kpn.olisto.com'; 
 		let token;
-
-		//remember to change the login option to KPN once the APIs are pushed 
 		
 		function loginKpnId() {
 			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
@@ -48,7 +46,7 @@
 					if (result.token) {
 						token = result.token;
 						clearInterval(intervalHandle);
-						demoForContext();
+						displayOverview();
 					}
 				}).catch(function(result) {
 					//404 is expected while in progress. Anything else is a real error
@@ -61,76 +59,47 @@
 			}, 1000);
 		}
 
-		function loginTriggiDev() {
-			$.ajax({
-					url: baseUrl + '/api/v1/user/account?response_type=bearer',
-					method: 'POST',
-					data: {
-						partnerKey: '7ze1d587238s7524f73k3333',
-						userId: 'userId0981238763420'
-					}
-				}).then(function(result) {
-					console.log(result);
-					if (result.token) {
-						token = result.token;
-						demoForContext();
-					}
-				}).catch(function(result) {
-					//404 is expected while in progress. Anything else is a real error
-					if (result.status !== 404) {
-						clearInterval(intervalHandle);
-						throw new Error('Cannot log in');
-					}
-				});
-		}
-
-		function demoForContext() {
 			let partnerBundles = [];
 			let selectedBundle;
 			let userBundles = [];
 			let channelDescriptions;
 			let validateBundleCall;
 			let parameters = {};
-			cleanPage();
 
-			$.ajax({
-				url: baseUrl + '/api/v1/channel/descriptions',
-				method: 'GET',
-				headers: {'Authorization': 'Bearer ' + token},
-				data: {"includeConnections": 1}
-			}).then(descriptions => {
-				channelDescriptions = descriptions;
+			function displayOverview() { 
+				cleanPage();
+				$.ajax({
+					url: baseUrl + '/api/v1/channel/descriptions',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token},
+					data: {"includeConnections": 1}
+				}).then(descriptions => {
+					channelDescriptions = descriptions;
+				}).catch(handleError);
 
-			//	// I used the call below to disconnect channels to check if connecting works. Will keep it till the demo, can be removed later. 
-			// 	$.ajax({
-			// 	url: baseUrl + '/api/v1/channelaccounts/' + channelDescriptions["eneco-toon"].channelAccounts[0]._id,
-			// 	method: 'DELETE',
-			// 	headers: {'Authorization': 'Bearer ' + token}
-			// })
-			}).catch(handleError);
+				let retrieveUserBundlesCall = {
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				};
 
-			let retrieveUserBundlesCall = {
-				url: baseUrl + '/api/v2/bundleInstances',
-				method: 'GET',
-				headers: {'Authorization': 'Bearer ' + token}
-			};
+				//Retrieve bundle templates
+				$.ajax({
+					url: baseUrl + '/api/v2/bundleTemplates',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token},
+					data: {'showOnlyPartner': 1}	
+				}).then(function(resultPartnerBundles) {
+					partnerBundles = resultPartnerBundles;
+					displayBundlesPartner(partnerBundles);
 
-			//Retrieve bundle templates
-			$.ajax({
-				url: baseUrl + '/api/v2/bundleTemplates',
-				method: 'GET',
-				headers: {'Authorization': 'Bearer ' + token},
-				data: {'showOnlyPartner': 1}	
-			}).then(function(resultPartnerBundles) {
-				partnerBundles = resultPartnerBundles;
-				displayBundlesPartner(partnerBundles);
-
-				//Retrieve current bundles - maybe this can be put in a separate functions bc it's repeated later on
-				return $.ajax(retrieveUserBundlesCall);
-			}).then(resultUserBundles => {
-				userBundles = resultUserBundles;
-				displayBundlesUser(userBundles);
-			}).catch(handleError);
+					//Retrieve current bundles - maybe this can be put in a separate functions bc it's repeated later on
+					return $.ajax(retrieveUserBundlesCall);
+				}).then(resultUserBundles => {
+					userBundles = resultUserBundles;
+					displayBundlesUser(userBundles);
+				}).catch(handleError);
+			}
 
 			window.selectBundle = function(bundleId) {
 				selectedBundle = partnerBundles.find(bundle => bundle._id === bundleId);
@@ -381,7 +350,11 @@
 				console.log(saveBundleCall);
 				$.ajax(saveBundleCall).then(bundleSaved => {
 					console.log("Bundle saved", bundleSaved);
-					return $.ajax(retrieveUserBundlesCall);
+					return $.ajax({
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				});
 				}).then(resultUserBundles => {
 					userBundles = resultUserBundles;
 					returnToOverview();
@@ -394,7 +367,11 @@
 					method: 'DELETE',
 					headers: {'Authorization': 'Bearer ' + token}
 				}).then(() => {
-						return $.ajax(retrieveUserBundlesCall);
+						return $.ajax({
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				});
 				}).then(resultUserBundles => {
 					userBundles = resultUserBundles;
 					returnToOverview();
@@ -427,7 +404,6 @@
 				console.log(error.toString());
 				console.log(JSON.stringify(error));
 			}
-		}
 
 		function displayBundlesUser(userBundles) {
 			let bundlesUserDiv = $("#bundlesUser");
@@ -463,6 +439,30 @@
 				);
 			}
 			bundlesPartnerDiv.append("<br/>");
+		}
+
+
+		function loginTriggiDev() {
+			$.ajax({
+					url: baseUrl + '/api/v1/user/account?response_type=bearer',
+					method: 'POST',
+					data: {
+						partnerKey: '7ze1d587238s7524f73k3333',
+						userId: 'userId0981238763420'
+					}
+				}).then(function(result) {
+					console.log(result);
+					if (result.token) {
+						token = result.token;
+						displayOverview();
+					}
+				}).catch(function(result) {
+					//404 is expected while in progress. Anything else is a real error
+					if (result.status !== 404) {
+						clearInterval(intervalHandle);
+						throw new Error('Cannot log in');
+					}
+				});
 		}
 
 		/*
