@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Olisto - Bundle validation API example</title>
+		<meta name="description" content="An example for the Olisto SDK">
+
+		<script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
+	</head>
+
+	<body>
+		<style>
+			#bundle > img {
+				margin-right: 6px;
+			}
+		</style>
+
+		<h2>Sample app for bundle validation with APIs</h2>
+		<button onclick="loginKpnId()">Login with KPN ID</button>
+
+		<div id="bundleTemplates"></div>
+		<div id="bundleInstances"></div>
+
+		<div id="bundleInstantiation"></div>
+		<div id="nameInputHolder"></div>
+		<div id="requiredChannels"></div>
+		<div id="requiredUnits"></div>
+		<div id="addUnits"></div>
+		<div id="unitPicker"></div>
+		<div id="continueButton"></div>
+		<div id="cancelButton"></div>
+	</body>
+
+	<script>
+		var baseUrl = 'https://connect-kpn.olisto.com'; 
+		let token;
+		let bundleTemplates = [];
+		let selectedBundle;
+		let bundleInstances = [];
+		let channelDescriptions;
+		let bundleData;
+		let parameters = {};
+
+		function displayOverview() { 
+			cleanPage();
+			getChannelDescriptions();
+			getBundleTemplates();
+			getBundleInstances();
+		}
+
+		function validateBundle() {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundleInstances/validate',
+				method: 'POST',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: bundleData
+			}).then(result => {
+				console.log("validation results", result);
+				if (result.valid === true) {
+					$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
+				} else if (result.missingSteps.channelsToConnect.length > 0) {
+					displayRequiredChannels(result.missingSteps.channelsToConnect);
+				} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
+					handleMissingUnits(result.missingSteps.addUnits);
+				}  else if (result.missingSteps.provideInputs.length > 0) {
+					addMissingInput(result.missingSteps.provideInputs[0]);
+				} else {
+					$("#continueButton").html("This app does not handle this, choose a different bundle template.");
+				} 
+			}).catch(handleError);
+		}
+
+		function displayRequiredChannels(channelsToConnect) {
+			$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
+			channelsToConnect.forEach((channel) => {
+				const channelId = channel['channelId'];
+				const channelName = channelDescriptions[channelId].channelInfo.title.en;
+				if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
+					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
+						"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
+						"</span><br/>"
+					);
+				} else {
+					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
+						"<button value='" + channelId + "' onclick='connectExternalChannel()'>Connect</button>" +
+						"</span><br/>"
+					);
+				}
+			});
+		}
+
+		function connectPlainChannel() {
+			$.ajax({
+				url: baseUrl + '/api/v1/channelaccounts',
+				method: 'POST',
+				headers: {
+					'Authorization': 'Bearer ' + token,
+					'Content-Type': "application/x-www-form-urlencoded",
+				},
+				data: {'channel': event.srcElement.value}
+			}).then(res => {
+				$("#requiredChannels").html("");
+				validateBundle();
+			});
+		}
+
+		function connectExternalChannel() {
+			let url = baseUrl + '/api/v1/accessControl/proxy/channel/' + event.srcElement.value + '/ops/signin?bearerToken=' + token;
+			window.open(url, 'Olisto', 'width=520,height=780,top=' + (screen.height - 400) + ',left=' + (screen.width - 840));
+			$("#requiredChannels").append("<br/> Please click refresh after you connect the channel(s) to Olisto.");
+			$("#continueButton").html("<br/><button id='refreshChannels'>Refresh</button>");
+			$("#refreshChannels").click(function() {
+				$("#requiredChannels").html("");
+				validateBundle();
+			})
+			//Room for improvement: refresh the list after user comes back to the page/set a timer
+		}
+
+		function getUnitTypeDescription(channelId, unitType) {
+			const channelDescription = channelDescriptions[channelId];
+			const unitTypeDescription = channelDescription && channelDescription.unitTypes.find(type => type.id === unitType);
+			if (!unitTypeDescription) {
+				console.warn('unit of unknown channel/type requested: ' + channelId + '/' + unitType);
+				return;
+			}
+			return unitTypeDescription;
+		}
+
+		function unAddable(missingUnit) {
+			return !getUnitTypeDescription(missingUnit.channel, missingUnit.type).allowAdding;
+		}
+
+		function handleMissingUnits(missingUnits) {
+			$("#addUnits").html("<br/><b>The following units need to be added:</b><br/>");
+			missingUnits.forEach(missingUnit => {
+				const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
+				if (unitTypeDescription.allowAdding) {
+					return;
+					// Dont need this if we only show missing units that are not addable
+					// $("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
+					// 	'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
+					// 	"</span><br/>"
+					// );
+				} else {
+					$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " + missingUnit.type + " for the channel " + missingUnit.channel +
+						"</span><br/>"
+					);
+					$("#continueButton").html("<br/>");
+				}
+			});
+		}
+
+		function createUnit(channel, type, name) {
+			let newUnit = {channel: channel, type: type, name: name};
+			return $.ajax({
+				url: baseUrl + '/channel/' + channel + '/units',
+				method: 'POST',
+				headers: {
+					'Authorization': 'Bearer ' + token,
+					'Content-Type': "application/json",
+				},
+				data: JSON.stringify(newUnit)
+			});
+		}
+
+		//TODO: Dont need this if we only show missing units that are not addable
+		function addUnit(channel, type) {
+			$("#addUnits").append("<br/>Unit name <input type='text' id='unitName' placeholder='name'><button id='addUnitButton'>Add unit</button>");
+			$("#addUnitButton").click(() => {
+				createUnit(channel, type, $('#unitName').val());
+			}).then(res => {
+				$("#addUnits").html("");
+				validateBundle();
+			}).catch(handleError);
+		}
+
+		function addMissingInput(input) {
+			path = input.path;
+			if (input.errCode === 'missing_unit') {
+				$("#unitPicker").html('');
+				$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
+				$.ajax({
+					url: baseUrl + '/api/v1/units',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token},
+					data: {
+						channel: input.type.channel,
+						type: input.type.unitType,
+					}
+				}).then(units => {
+					const isMulti = input.type.isMulti === true;
+					for (let unit of units) {
+						$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
+					}
+					$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
+					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
+					$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+					$("#newUnitButton").click(() => {
+						createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
+							addMissingInput(input);
+						});
+					});
+				}).catch(handleError);
+			} else if (input.errCode === 'missing_value'){
+				$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
+				$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
+				$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
+			} else {
+				$("#unitPicker").append("<br/><b> Cannot deal with the missing input type.<b>");
+				//add more specific information maybe
+			}
+		}
+
+		function submitValue(path) {
+			if ($("input:text[name='" + path + "']").val() === "") {
+				alert('Please provide a value.');
+				return;
+			}
+			parameters[path] = $("input:text[name='" + path + "']").val();
+			$("input:text[name='" + path + "']").prop("disabled", true).css("background-color", "lightgray");
+			bundleData.parameters = parameters;
+			validateBundle();
+		}
+
+		function submitUnit(path) {
+			if ($("input:radio[name='" + path + "']:checked").length != 1) {
+				alert("You need to choose a unit.");
+				return;
+			}
+			parameters[path] = {};
+			$("input:radio[name='" + path + "']:checked").each(function(i,v){
+				parameters[path]._id = $(v).attr('id'),
+				parameters[path].endpoint = $(this).val()
+			});
+			$("input:radio[name='" + path + "']").each(function(){
+				$(this).prop("disabled", true);
+			});
+			bundleData.parameters = parameters;
+			validateBundle();
+		}
+
+		function submitMultiUnits(path) {
+			if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
+				alert("Choose at least one unit above.");
+				return;
+			}
+			parameters[path] = [];
+			$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
+				parameters[path].push({
+					_id: $(v).attr('id'),
+					endpoint: $(this).val()
+				});
+			});
+			$("input:checkbox[name='" + path + "']").each(function(){
+				$(this).prop("disabled", true);
+			});
+			bundleData.parameters = parameters;
+			validateBundle();
+		}
+
+		function selectBundle(bundleId) {
+			selectedBundle = bundleTemplates.find(bundle => bundle._id === bundleId);
+			nameBundle();
+		}
+
+		function nameBundle() {
+			$("#bundleTemplates").html("");
+			$("#bundleInstances").html("");
+
+			let bundle = bundleTemplates.find(function(bundle) {
+				return bundle.id === event.srcElement.value;
+			});
+			$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
+			$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name' value='" + bundle.name.en + "'>");
+			$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
+			$("#cancelButton").html("<button onclick='returnToOverview()'>Cancel</button><br/><br/>");
+		}
+
+		function addBundle() {
+			if ($('#nameInput').val() === "") {
+				alert('You need to choose the bundle name');
+				return;
+			}
+			bundleData = {
+				parameters: JSON.stringify(parameters),
+				bundleTemplateId: event.srcElement.value,
+				name: $('#nameInput').val()
+			}
+			$("#nameInputHolder").html("<br/><b>Chosen bundle name: </b><br/>" + $('#nameInput').val());
+			validateBundle();
+		}
+
+		function saveBundle() {
+			$.ajax({
+				url: baseUrl + "/api/v2/bundleInstances",
+				method: 'POST',
+				headers: {'Authorization': 'Bearer ' + token},
+				data: bundleData
+			}).then(bundleSaved => {
+				console.log("Bundle saved", bundleSaved);
+				return $.ajax({
+				url: baseUrl + '/api/v2/bundleInstances',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token}
+			});
+			}).then(instances => {
+				bundleInstances = instances;
+				returnToOverview();
+			}).catch(handleError);
+		}
+
+		function removeBundle() {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundleInstances/' + event.srcElement.value,
+				method: 'DELETE',
+				headers: {'Authorization': 'Bearer ' + token}
+			}).then(() => {
+				return $.ajax({
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				});
+			}).then(instances => {
+				bundleInstances = instances;
+				returnToOverview();
+			}).catch(handleError);
+		}
+
+		function getBundleTemplates() {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundleTemplates',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token},
+			}).then(function(templates) {
+				bundleTemplates = templates;
+				displayBundleTemplates();
+			}).catch(handleError);
+		}
+
+		function displayBundleTemplates() {
+			let bundleTemplatesDiv = $("#bundleTemplates");
+			bundleTemplatesDiv.html("<b>Available:</b>");
+			for (let bundle of bundleTemplates) {
+				bundleTemplatesDiv.append(
+					"<div id='bundle'>" +
+					"<img src='" + getFullImgURL(bundle.images.header) + "' height='42' width='84'>" +
+					bundle.name.en +
+					" <button value='" + bundle.id + "' onclick='selectBundle(\""+bundle.id+"\")'>Add</button>" +
+					"</div>"
+				);
+			}
+			bundleTemplatesDiv.append("<br/>");
+		}
+
+		function getBundleInstances() {
+			$.ajax({
+				url: baseUrl + '/api/v2/bundleInstances',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token}
+			}).then(instances => {
+				bundleInstances = instances;
+				displayBundleInstances();
+			}).catch(handleError);
+		}
+
+		function displayBundleInstances() {
+			let bundleInstancesDiv = $("#bundleInstances");
+			bundleInstancesDiv.html("<b>Activated:</b>");
+			if (bundleInstances.length > 9) {
+				bundleInstancesDiv.append("<i>(Retrieved " + bundleInstances.length + " showing 10 max)</i>");
+			}
+			bundleInstancesDiv.append("<br/>");
+
+			for (let i in bundleInstances) {
+				bundleInstancesDiv.append(
+					"<div id='bundle'>" +
+					bundleInstances[i].name +
+					" <button value='" + bundleInstances[i]._id + "' onclick='removeBundle()'>Delete</button>" +
+					"</div>"
+				);
+				if (i > 8) {
+					break;
+				}
+			}
+		}
+
+		function returnToOverview() {
+			cleanPage();
+			parameters = {};
+			displayBundleTemplates(bundleTemplates);
+			displayBundleInstances(bundleInstances);
+		}
+
+		function getChannelDescriptions() {
+			$.ajax({
+				url: baseUrl + '/api/v1/channel/descriptions',
+				method: 'GET',
+				headers: {'Authorization': 'Bearer ' + token},
+			}).then(descriptions => {
+				channelDescriptions = descriptions;
+			}).catch(handleError);
+		}
+
+		function cleanPage() {
+			$("#bundleInstantiation").html("");
+			$("#nameInputHolder").html("");
+			$("#requiredChannels").html("");
+			$("#requiredUnits").html("");
+			$("#addUnits").html("");
+			$("#unitPicker").html("");
+			$("#continueButton").html("");
+			$("#cancelButton").html("");
+		}
+
+		function getFullImgURL(id) {
+			return baseUrl + '/api/v1/files/' + id;
+		}
+
+		function handleError(error) {
+			console.log(error.toString());
+			console.log(JSON.stringify(error));
+		}
+
+		function loginKpnId() {
+			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
+			window.open(baseUrl + '/kpn/auth?session=' + sessionId, '_blank');
+			var intervalHandle = setInterval(function() {
+				$.ajax({
+					url: baseUrl + '/kpn/loginSession/' + sessionId + '?response_type=bearer',
+					method: 'GET',
+				}).then(function(result) {
+					if (result.token) {
+						token = result.token;
+						clearInterval(intervalHandle);
+						displayOverview();
+					}
+				}).catch(function(result) {
+					//404 is expected while in progress. Anything else is a real error
+					if (result.status !== 404) {
+						clearInterval(intervalHandle);
+						throw new Error('Cannot log in');
+					}
+				});
+
+			}, 1000);
+		}
+
+		function loginTriggiDev() {
+			$.ajax({
+					url: baseUrl + '/api/v1/user/account?response_type=bearer',
+					method: 'POST',
+					data: {
+						partnerKey: '7ze1d587238s7524f73k3333',
+						userId: 'userId0981238763420'
+					}
+				}).then(function(result) {
+					console.log(result);
+					if (result.token) {
+						token = result.token;
+						displayOverview();
+					}
+				}).catch(function(result) {
+					//404 is expected while in progress. Anything else is a real error
+					if (result.status !== 404) {
+						clearInterval(intervalHandle);
+						throw new Error('Cannot log in');
+					}
+				});
+		}
+
+	</script>
+</html>
