@@ -18,8 +18,8 @@
 		<h2>Sample app for bundle validation with APIs</h2>
 		<button onclick="loginKpnId()">Login with KPN ID</button>
 
-		<div id="bundlesPartner"></div>
-		<div id="bundlesUser"></div>
+		<div id="bundleTemplates"></div>
+		<div id="bundleInstances"></div>
 
 		<div id="bundleInstantiation"></div>
 		<div id="nameInputHolder"></div>
@@ -34,9 +34,9 @@
 	<script>
 		var baseUrl = 'https://connect-kpn.olisto.com'; 
 		let token;
-		let partnerBundleTemplates = [];
+		let bundleTemplates = [];
 		let selectedBundle;
-		let userBundles = [];
+		let bundleInstances = [];
 		let channelDescriptions;
 		let bundleData;
 		let parameters = {};
@@ -45,7 +45,7 @@
 			cleanPage();
 			getChannelDescriptions();
 			getBundleTemplates();
-			getUserBundles();
+			getBundleInstances();
 		}
 
 		function validateBundle() {
@@ -260,15 +260,15 @@
 		}
 
 		function selectBundle(bundleId) {
-			selectedBundle = partnerBundleTemplates.find(bundle => bundle._id === bundleId);
+			selectedBundle = bundleTemplates.find(bundle => bundle._id === bundleId);
 			nameBundle();
 		}
 
 		function nameBundle() {
-			$("#bundlesPartner").html("");
-			$("#bundlesUser").html("");
+			$("#bundleTemplates").html("");
+			$("#bundleInstances").html("");
 
-			let bundle = partnerBundleTemplates.find(function(bundle) {
+			let bundle = bundleTemplates.find(function(bundle) {
 				return bundle.id === event.srcElement.value;
 			});
 			$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
@@ -304,8 +304,8 @@
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token}
 			});
-			}).then(resultUserBundles => {
-				userBundles = resultUserBundles;
+			}).then(instances => {
+				bundleInstances = instances;
 				returnToOverview();
 			}).catch(handleError);
 		}
@@ -316,13 +316,13 @@
 				method: 'DELETE',
 				headers: {'Authorization': 'Bearer ' + token}
 			}).then(() => {
-					return $.ajax({
-				url: baseUrl + '/api/v2/bundleInstances',
-				method: 'GET',
-				headers: {'Authorization': 'Bearer ' + token}
-			});
-			}).then(resultUserBundles => {
-				userBundles = resultUserBundles;
+				return $.ajax({
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				});
+			}).then(instances => {
+				bundleInstances = instances;
 				returnToOverview();
 			}).catch(handleError);
 		}
@@ -332,18 +332,17 @@
 				url: baseUrl + '/api/v2/bundleTemplates',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token},
-				data: {'showOnlyPartner': 1}	
-			}).then(function(resultpartnerBundleTemplates) {
-				partnerBundleTemplates = resultpartnerBundleTemplates;
-				displayBundlesPartner(partnerBundleTemplates);
+			}).then(function(templates) {
+				bundleTemplates = templates;
+				displayBundleTemplates();
 			}).catch(handleError);
 		}
 
-		function displayBundlesPartner(partnerBundleTemplates) {
-			let bundlesPartnerDiv = $("#bundlesPartner");
-			bundlesPartnerDiv.html("<b>Available:</b>");
-			for (let bundle of partnerBundleTemplates) {
-				bundlesPartnerDiv.append(
+		function displayBundleTemplates() {
+			let bundleTemplatesDiv = $("#bundleTemplates");
+			bundleTemplatesDiv.html("<b>Available:</b>");
+			for (let bundle of bundleTemplates) {
+				bundleTemplatesDiv.append(
 					"<div id='bundle'>" +
 					"<img src='" + getFullImgURL(bundle.images.header) + "' height='42' width='84'>" +
 					bundle.name.en +
@@ -351,33 +350,33 @@
 					"</div>"
 				);
 			}
-			bundlesPartnerDiv.append("<br/>");
+			bundleTemplatesDiv.append("<br/>");
 		}
 
-		function getUserBundles() {
+		function getBundleInstances() {
 			$.ajax({
 				url: baseUrl + '/api/v2/bundleInstances',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token}
-			}).then(resultUserBundles => {
-				userBundles = resultUserBundles;
-				displayBundlesUser(userBundles);
+			}).then(instances => {
+				bundleInstances = instances;
+				displayBundleInstances();
 			}).catch(handleError);
 		}
 
-		function displayBundlesUser(userBundles) {
-			let bundlesUserDiv = $("#bundlesUser");
-			bundlesUserDiv.html("<b>Activated:</b>");
-			if (userBundles.length > 9) {
-				bundlesUserDiv.append("<i>(Retrieved " + userBundles.length + " showing 10 max)</i>");
+		function displayBundleInstances() {
+			let bundleInstancesDiv = $("#bundleInstances");
+			bundleInstancesDiv.html("<b>Activated:</b>");
+			if (bundleInstances.length > 9) {
+				bundleInstancesDiv.append("<i>(Retrieved " + bundleInstances.length + " showing 10 max)</i>");
 			}
-			bundlesUserDiv.append("<br/>");
+			bundleInstancesDiv.append("<br/>");
 
-			for (let i in userBundles) {
-				bundlesUserDiv.append(
+			for (let i in bundleInstances) {
+				bundleInstancesDiv.append(
 					"<div id='bundle'>" +
-					userBundles[i].name +
-					" <button value='" + userBundles[i]._id + "' onclick='removeBundle()'>Delete</button>" +
+					bundleInstances[i].name +
+					" <button value='" + bundleInstances[i]._id + "' onclick='removeBundle()'>Delete</button>" +
 					"</div>"
 				);
 				if (i > 8) {
@@ -389,8 +388,8 @@
 		function returnToOverview() {
 			cleanPage();
 			parameters = {};
-			displayBundlesPartner(partnerBundleTemplates);
-			displayBundlesUser(userBundles);
+			displayBundleTemplates(bundleTemplates);
+			displayBundleInstances(bundleInstances);
 		}
 
 		function getChannelDescriptions() {
@@ -398,7 +397,6 @@
 				url: baseUrl + '/api/v1/channel/descriptions',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token},
-				data: {"includeConnections": 1}
 			}).then(descriptions => {
 				channelDescriptions = descriptions;
 			}).catch(handleError);
