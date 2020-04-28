@@ -189,18 +189,30 @@
 					}
 				}).then(units => {
 					const isMulti = input.type.isMulti === true;
+					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
 					for (let unit of units) {
 						$("div[id='"+divID+"']").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
 						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 					}
-					$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
-					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
-					$("div[id='"+divID+"']").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
-					$("#newUnitButton").click(() => {
-						createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
-							addMissingInput(input, divID);
+					$("#continueButton").html("<br/><button id='submitButton'>Continue</button>");
+					$("#submitButton").click(() => {
+						if (isMulti) {
+							submitMultiUnits(path, unitType);
+						} else {
+							submitUnit(path, unitType);
+						}
+					})
+					//execute the following only for addable DONE
+					//add ID to new unit name and button 
+					//disable them in the end 
+					if (unitType.allowAdding) {
+						$("div[id='"+divID+"']").append("<div id='addUnit" + path + "'> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+						$("#newUnitButton").click(() => {
+							createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
+								addMissingInput(input, divID);
+							});
 						});
-					});
+					}
 				}).catch(handleError);
 			} else if (input.errCode === 'missing_value'){
 				$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
@@ -223,10 +235,13 @@
 			validateBundle();
 		}
 
-		function submitUnit(path) {
+		function submitUnit(path, unitType) {
 			if ($("input:radio[name='" + path + "']:checked").length != 1) {
 				alert("You need to choose a unit.");
 				return;
+			}
+			if (unitType.allowAdding) {
+				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = {};
 			$("input:radio[name='" + path + "']:checked").each(function(i,v){
@@ -240,10 +255,13 @@
 			validateBundle();
 		}
 
-		function submitMultiUnits(path) {
+		function submitMultiUnits(path, unitType) {
 			if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
 				alert("Choose at least one unit above.");
 				return;
+			}
+			if (unitType.allowAdding) {
+				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = [];
 			$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
