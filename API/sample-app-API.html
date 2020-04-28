@@ -63,7 +63,7 @@
 				} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
 					handleMissingUnits(result.missingSteps.addUnits);
 				}  else if (result.missingSteps.provideInputs.length > 0) {
-					addMissingInput(result.missingSteps.provideInputs[0]);
+					addMissingInput(result.missingSteps.provideInputs[0], 0);
 				} else {
 					$("#continueButton").html("This app does not handle this, choose a different bundle template.");
 				} 
@@ -169,11 +169,16 @@
 			}).catch(handleError);
 		}
 
-		function addMissingInput(input) {
+		function addMissingInput(input, divID) {
 			path = input.path;
 			if (input.errCode === 'missing_unit') {
-				$("#unitPicker").html('');
-				$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
+				if (!divID) {
+					divID = "unit" + path;
+					$("#unitPicker").append("<div id='" + divID + "'></div>");
+				} else {
+					$("div[id='"+divID+"']").html("");
+				}
+				$("div[id='"+divID+"']").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
 				$.ajax({
 					url: baseUrl + '/api/v1/units',
 					method: 'GET',
@@ -185,15 +190,15 @@
 				}).then(units => {
 					const isMulti = input.type.isMulti === true;
 					for (let unit of units) {
-						$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+						$("div[id='"+divID+"']").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
 						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 					}
 					$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
 					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
-					$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+					$("div[id='"+divID+"']").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
 					$("#newUnitButton").click(() => {
 						createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
-							addMissingInput(input);
+							addMissingInput(input, divID);
 						});
 					});
 				}).catch(handleError);
