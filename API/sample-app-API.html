@@ -136,11 +136,6 @@
 				const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
 				if (unitTypeDescription.allowAdding) {
 					return;
-					// Dont need this if we only show missing units that are not addable
-					// $("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
-					// 	'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
-					// 	"</span><br/>"
-					// );
 				} else {
 					$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " + missingUnit.type + " for the channel " + missingUnit.channel +
 						"</span><br/>"
@@ -444,29 +439,6 @@
 				});
 
 			}, 1000);
-		}
-
-		function loginTriggiDev() {
-			$.ajax({
-					url: baseUrl + '/api/v1/user/account?response_type=bearer',
-					method: 'POST',
-					data: {
-						partnerKey: '7ze1d587238s7524f73k3333',
-						userId: 'userId0981238763420'
-					}
-				}).then(function(result) {
-					console.log(result);
-					if (result.token) {
-						token = result.token;
-						displayOverview();
-					}
-				}).catch(function(result) {
-					//404 is expected while in progress. Anything else is a real error
-					if (result.status !== 404) {
-						clearInterval(intervalHandle);
-						throw new Error('Cannot log in');
-					}
-				});
 		}
 
 	</script>
