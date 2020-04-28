@@ -176,9 +176,9 @@
 					divID = "unit" + path;
 					$("#unitPicker").append("<div id='" + divID + "'></div>");
 				} else {
-					$("div[id='"+divID+"']").html("");
+					$("div[id='" + divID + "']").html("");
 				}
-				$("div[id='"+divID+"']").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
+				$("div[id='" + divID + "']").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
 				$.ajax({
 					url: baseUrl + '/api/v1/units',
 					method: 'GET',
@@ -191,7 +191,7 @@
 					const isMulti = input.type.isMulti === true;
 					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
 					for (let unit of units) {
-						$("div[id='"+divID+"']").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+						$("div[id='" + divID + "']").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
 						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 					}
 					$("#continueButton").html("<br/><button id='submitButton'>Continue</button>");
@@ -202,11 +202,8 @@
 							submitUnit(path, unitType);
 						}
 					})
-					//execute the following only for addable DONE
-					//add ID to new unit name and button 
-					//disable them in the end 
 					if (unitType.allowAdding) {
-						$("div[id='"+divID+"']").append("<div id='addUnit" + path + "'> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+						$("div[id='" + divID + "']").append("<div id='addUnit" + path + "'> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
 						$("#newUnitButton").click(() => {
 							createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
 								addMissingInput(input, divID);
