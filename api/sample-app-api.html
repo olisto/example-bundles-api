@@ -16,7 +16,7 @@
 		</style>
 
 		<h2>Sample app for bundle validation with APIs</h2>
-		<button onclick="loginKpnId()">Login with KPN ID</button>
+		<button onclick="loginGreenId()">Log in</button>
 
 		<div id="bundleTemplates"></div>
 		<div id="bundleInstances"></div>
@@ -32,7 +32,7 @@
 	</body>
 
 	<script>
-		var baseUrl = 'https://connect-kpn.olisto.com'; 
+		var baseUrl = 'https://connect-green.olisto.com';
 		let token;
 		let bundleTemplates = [];
 		let selectedBundle;
@@ -63,7 +63,7 @@
 				} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
 					handleMissingUnits(result.missingSteps.addUnits);
 				}  else if (result.missingSteps.provideInputs.length > 0) {
-					addMissingInput(result.missingSteps.provideInputs[0]);
+					addMissingInput(result.missingSteps.provideInputs[0], 0);
 				} else {
 					$("#continueButton").html("This app does not handle this, choose a different bundle template.");
 				} 
@@ -136,11 +136,6 @@
 				const unitTypeDescription = getUnitTypeDescription(missingUnit.channel, missingUnit.type);
 				if (unitTypeDescription.allowAdding) {
 					return;
-					// Dont need this if we only show missing units that are not addable
-					// $("#addUnits").append("<span id='" + missingUnit.type + "'> " + unitTypeDescription.title.en + " " +
-					// 	'<button value="' + missingUnit.type + '" onclick="addUnit(\'' + missingUnit.channel + '\',\'' + missingUnit.type + '\')">Add unit</button>' +
-					// 	"</span><br/>"
-					// );
 				} else {
 					$("#addUnits").append("<span id='" + missingUnit.type + "'> No units " + missingUnit.type + " for the channel " + missingUnit.channel +
 						"</span><br/>"
@@ -163,7 +158,7 @@
 			});
 		}
 
-		//TODO: Dont need this if we only show missing units that are not addable
+		// Don't need this if we only show missing units that are not addable
 		function addUnit(channel, type) {
 			$("#addUnits").append("<br/>Unit name <input type='text' id='unitName' placeholder='name'><button id='addUnitButton'>Add unit</button>");
 			$("#addUnitButton").click(() => {
@@ -174,11 +169,16 @@
 			}).catch(handleError);
 		}
 
-		function addMissingInput(input) {
+		function addMissingInput(input, divID) {
 			path = input.path;
 			if (input.errCode === 'missing_unit') {
-				$("#unitPicker").html('');
-				$("#unitPicker").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
+				if (!divID) {
+					divID = "unit" + path;
+					$("#unitPicker").append("<div id='" + divID + "'></div>");
+				} else {
+					$("div[id='" + divID + "']").html("");
+				}
+				$("div[id='" + divID + "']").append("<br/><b>" + selectedBundle.wizardPages[input.path.split('.')[0]].wizardEditors[input.path.split('.')[1]].label.en + "</b>");
 				$.ajax({
 					url: baseUrl + '/api/v1/units',
 					method: 'GET',
@@ -189,26 +189,45 @@
 					}
 				}).then(units => {
 					const isMulti = input.type.isMulti === true;
+					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
 					for (let unit of units) {
-						$("#unitPicker").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
+						$("div[id='" + divID + "']").append("<div> <input type='" + (isMulti ? "checkbox" : "radio") +"' name='" + path +
 						"' id='" + unit._id + "' value='" + unit.endpoint + "'> " + unit.name + "</div>");
 					}
-					$("#continueButton").html("<br/><button onclick=\"" + (isMulti ? 'submitMultiUnits' : 'submitUnit') + "('" + path + "')\">Continue</button>");
-					const unitType = getUnitTypeDescription(input.type.channel, input.type.unitType);
-					$("#unitPicker").append("<div> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
-					$("#newUnitButton").click(() => {
-						createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
-							addMissingInput(input);
+					$("#continueButton").html("<br/><button id='submitButton'>Continue</button>");
+					$("#submitButton").click(() => {
+						if (isMulti) {
+							submitMultiUnits(path, unitType);
+						} else {
+							submitUnit(path, unitType);
+						}
+					})
+					if (unitType.allowAdding) {
+						$("div[id='" + divID + "']").append("<div id='addUnit" + path + "'> <input type='text' id='newUnitName'><button id='newUnitButton'>Add new " + unitType.title.en + "</button></div>");
+						$("#newUnitButton").click(() => {
+							if (!$("#newUnitName").val()) {
+								alert("Provide a name.");
+							} else {
+								createUnit(input.type.channel, input.type.unitType, $("#newUnitName").val()).then(unit => {
+									addMissingInput(input, divID);
+								});
+							}
 						});
-					});
+					}
 				}).catch(handleError);
 			} else if (input.errCode === 'missing_value'){
-				$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
-				$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
-				$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
+				if (input.type.editor.editor != "text" && input.type.editor.editor != "variable") {
+					$("#unitPicker").append("<br/>This app does not handle the following input type: " + input.type.editor.editor);
+					$("#continueButton").html("Please choose another bundle template.");
+				} else {
+					$("#unitPicker").append("<br/><b>" + input.type.editor.label.en + " </b>");
+					$("#unitPicker").append("<br/> <input type='text' name='" + path + "' id='" + path + "' placeholder='" + input.type.editor.properties.valueName + "'>");
+					$("#continueButton").html("<br/><button onclick=\"submitValue('" + path + "')\">Continue</button>");
+				}
 			} else {
-				$("#unitPicker").append("<br/><b> Cannot deal with the missing input type.<b>");
-				//add more specific information maybe
+				$("#unitPicker").append("<br/><b> Cannot deal with the error or missing input type.<b>");
+				$("#unitPicker").append("<br/>Error: " + input.errCode + ". " + input.error);
+				$("#continueButton").html("Please choose another bundle template.");
 			}
 		}
 
@@ -223,10 +242,13 @@
 			validateBundle();
 		}
 
-		function submitUnit(path) {
+		function submitUnit(path, unitType) {
 			if ($("input:radio[name='" + path + "']:checked").length != 1) {
 				alert("You need to choose a unit.");
 				return;
+			}
+			if (unitType.allowAdding) {
+				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = {};
 			$("input:radio[name='" + path + "']:checked").each(function(i,v){
@@ -240,10 +262,13 @@
 			validateBundle();
 		}
 
-		function submitMultiUnits(path) {
+		function submitMultiUnits(path, unitType) {
 			if ($("input:checkbox[name='" + path + "']:checked").length < 1) {
 				alert("Choose at least one unit above.");
 				return;
+			}
+			if (unitType.allowAdding) {
+				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = [];
 			$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
@@ -422,12 +447,12 @@
 			console.log(JSON.stringify(error));
 		}
 
-		function loginKpnId() {
+		function loginGreenId() {
 			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
-			window.open(baseUrl + '/kpn/auth?session=' + sessionId, '_blank');
+			window.open(baseUrl + '/api/v1/users/green/auth?session=' + sessionId, '_blank');
 			var intervalHandle = setInterval(function() {
 				$.ajax({
-					url: baseUrl + '/kpn/loginSession/' + sessionId + '?response_type=bearer',
+					url: baseUrl + '/api/v1/users/green/loginSession/' + sessionId + '?response_type=bearer',
 					method: 'GET',
 				}).then(function(result) {
 					if (result.token) {
@@ -444,29 +469,6 @@
 				});
 
 			}, 1000);
-		}
-
-		function loginTriggiDev() {
-			$.ajax({
-					url: baseUrl + '/api/v1/user/account?response_type=bearer',
-					method: 'POST',
-					data: {
-						partnerKey: '7ze1d587238s7524f73k3333',
-						userId: 'userId0981238763420'
-					}
-				}).then(function(result) {
-					console.log(result);
-					if (result.token) {
-						token = result.token;
-						displayOverview();
-					}
-				}).catch(function(result) {
-					//404 is expected while in progress. Anything else is a real error
-					if (result.status !== 404) {
-						clearInterval(intervalHandle);
-						throw new Error('Cannot log in');
-					}
-				});
 		}
 
 	</script>
