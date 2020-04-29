@@ -16,7 +16,7 @@
 		</style>
 
 		<h2>Sample app for bundle validation with APIs</h2>
-		<button onclick="loginKpnId()">Login with KPN ID</button>
+		<button onclick="loginGreenId()">Log in</button>
 
 		<div id="bundleTemplates"></div>
 		<div id="bundleInstances"></div>
@@ -32,7 +32,7 @@
 	</body>
 
 	<script>
-		var baseUrl = 'https://connect-kpn.olisto.com'; 
+		var baseUrl = 'https://connect-green.olisto.com';
 		let token;
 		let bundleTemplates = [];
 		let selectedBundle;
@@ -447,12 +447,12 @@
 			console.log(JSON.stringify(error));
 		}
 
-		function loginKpnId() {
+		function loginGreenId() {
 			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
-			window.open(baseUrl + '/kpn/auth?session=' + sessionId, '_blank');
+			window.open(baseUrl + '/api/v1/users/green/auth?session=' + sessionId, '_blank');
 			var intervalHandle = setInterval(function() {
 				$.ajax({
-					url: baseUrl + '/kpn/loginSession/' + sessionId + '?response_type=bearer',
+					url: baseUrl + '/api/v1/users/green/loginSession/' + sessionId + '?response_type=bearer',
 					method: 'GET',
 				}).then(function(result) {
 					if (result.token) {
