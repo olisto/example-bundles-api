@@ -29,6 +29,13 @@
 		<div id="unitPicker"></div>
 		<div id="continueButton"></div>
 		<div id="cancelButton"></div>
+		<form
+				id="connectChannelForm"
+				method="post"
+				target="_blank"
+		>
+			<input id="tokenInput" type="hidden" name="token"/>
+		</form>
 	</body>
 
 	<script>
@@ -74,7 +81,7 @@
 			$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
 			channelsToConnect.forEach((channel) => {
 				const channelId = channel['channelId'];
-				const channelName = channelDescriptions[channelId].channelInfo.title.en;
+				const channelName = channelDescriptions[channelId].channelInfo.title.en || channelDescriptions[channelId].channelInfo.title;
 				if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
 					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
 						"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
@@ -105,8 +112,12 @@
 		}
 
 		function connectExternalChannel() {
-			let url = baseUrl + '/api/v1/accessControl/proxy/channel/' + event.srcElement.value + '/ops/signin?bearerToken=' + token;
-			window.open(url, 'Olisto', 'width=520,height=780,top=' + (screen.height - 400) + ',left=' + (screen.width - 840));
+			let url = baseUrl + '/api/v1/accessControl/proxy/channel/' + event.srcElement.value + '/ops/signin?acmTokenFromBody=1';
+
+			document.getElementById("connectChannelForm").action = url;
+			document.getElementById("tokenInput").value = token;
+			document.getElementById("connectChannelForm").submit();
+
 			$("#requiredChannels").append("<br/> Please click refresh after you connect the channel(s) to Olisto.");
 			$("#continueButton").html("<br/><button id='refreshChannels'>Refresh</button>");
 			$("#refreshChannels").click(function() {
