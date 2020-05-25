@@ -66,7 +66,9 @@
 				if (result.valid === true) {
 					$("#continueButton").html("<br/>The bundle is valid. Do you want to save it?<br/><button onclick='saveBundle()'>Save</button>");
 				} else if (result.missingSteps.channelsToConnect.length > 0) {
-					displayRequiredChannels(result.missingSteps.channelsToConnect);
+					displayRequiredChannels(result.missingSteps.channelsToConnect, 'connect');
+				} else if (result.missingSteps.channelsToReconnect.length > 0) {
+					displayRequiredChannels(result.missingSteps.channelsToReconnect, 'reconnect');
 				} else if (result.missingSteps.addUnits.filter(unAddable).length > 0) {
 					handleMissingUnits(result.missingSteps.addUnits);
 				}  else if (result.missingSteps.provideInputs.length > 0) {
@@ -77,19 +79,19 @@
 			}).catch(handleError);
 		}
 
-		function displayRequiredChannels(channelsToConnect) {
-			$("#requiredChannels").html("<br/><b>The following channels still need to be connected:</b><br/>");
+		function displayRequiredChannels(channelsToConnect, connectOrReconnect) {
+			$("#requiredChannels").html(`<br/><b>The following channels still need to be ${connectOrReconnect}ed:</b><br/>`);
 			channelsToConnect.forEach((channel) => {
 				const channelId = channel['channelId'];
 				const channelName = channelDescriptions[channelId].channelInfo.title.en || channelDescriptions[channelId].channelInfo.title;
 				if (channelDescriptions[channelId].channelInfo.connectMethod === "plain") {
 					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
-						"<button value='" + channelId + "' onclick='connectPlainChannel()'>Connect</button>" +
+						"<button value='" + channelId + "' onclick='connectPlainChannel()'>" + connectOrReconnect + "</button>" +
 						"</span><br/>"
 					);
 				} else {
 					$("#requiredChannels").append("<span id='" + channelId + "'> " + channelName + " " +
-						"<button value='" + channelId + "' onclick='connectExternalChannel()'>Connect</button>" +
+						"<button value='" + channelId + "' onclick='connectExternalChannel()'>" + connectOrReconnect + "</button>" +
 						"</span><br/>"
 					);
 				}
