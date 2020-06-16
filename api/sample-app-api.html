@@ -16,7 +16,15 @@
 		</style>
 
 		<h2>Sample app for bundle validation with APIs</h2>
-		<button onclick="loginGreenId()">Log in</button>
+		<div>
+			<button onclick="loginGreenId()">Log in using OpenID</button>
+		</div>
+		- or -
+		<div>
+			<input id="partnerId" type="text" placeholder="Partner ID" name="partnerId"/><br/>
+			<input id="partnerAccessToken" type="text" placeholder="Partner token" name="partnerAccessToken"/><br/>
+			<button onclick="loginPartnerToken()">Log in using token</button><br/>
+		</div>
 
 		<div id="bundleTemplates"></div>
 		<div id="bundleInstances"></div>
@@ -485,6 +493,29 @@
 				});
 
 			}, 1000);
+		}
+
+		function loginPartnerToken() {
+			var partnerAccessToken = document.getElementById('partnerAccessToken').value;
+			var partnerId = document.getElementById('partnerId').value;
+			$.ajax({
+				url: baseUrl + '/api/v1/users/green/session?response_type=bearer',
+				method: 'POST',
+				data: {
+					partnerId,
+					partnerAccessToken,
+				},
+			}).then(function(result) {
+				console.log('result', result);
+				if (result.token) {
+					token = result.token;
+					displayOverview();
+				}
+			}).catch(function(result) {
+				console.log('Can not log in', result);
+				alert('Can not log in');
+			});
+
 		}
 
 	</script>
