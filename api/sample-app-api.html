@@ -443,7 +443,7 @@
 
 		function getChannelDescriptions() {
 			$.ajax({
-				url: baseUrl + '/api/v1/channel/descriptions',
+				url: baseUrl + '/api/v1/channels/descriptions?includeConnections=1',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token},
 			}).then(descriptions => {
