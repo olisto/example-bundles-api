@@ -59,7 +59,7 @@
 		let bundleData;
 		let parameters = {};
 
-		function displayOverview() { 
+		function displayOverview() {
 			cleanPage();
 			getChannelDescriptions();
 			getBundleTemplates();
@@ -86,7 +86,7 @@
 					addMissingInput(result.missingSteps.provideInputs[0], 0);
 				} else {
 					$("#continueButton").html("This app does not handle this, choose a different bundle template.");
-				} 
+				}
 			}).catch(handleError);
 		}
 
@@ -135,7 +135,7 @@
 
 			$("#requiredChannels").append("<br/> Please click refresh after you connect the channel(s) to Olisto.");
 			$("#continueButton").html("<br/><button id='refreshChannels'>Refresh</button>");
-			$("#refreshChannels").click(function() {
+			$("#refreshChannels").click(() => {
 				$("#requiredChannels").html("");
 				validateBundle();
 			})
@@ -277,11 +277,11 @@
 				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = {};
-			$("input:radio[name='" + path + "']:checked").each(function(i,v){
+			$("input:radio[name='" + path + "']:checked").each((i,v) => {
 				parameters[path]._id = $(v).attr('id'),
 				parameters[path].endpoint = $(this).val()
 			});
-			$("input:radio[name='" + path + "']").each(function(){
+			$("input:radio[name='" + path + "']").each(() => {
 				$(this).prop("disabled", true);
 			});
 			bundleData.parameters = parameters;
@@ -297,13 +297,13 @@
 				$("div[id='addUnit" + path + "']").html("");
 			}
 			parameters[path] = [];
-			$("input:checkbox[name='" + path + "']:checked").each(function(i,v){
+			$("input:checkbox[name='" + path + "']:checked").each((i,v) => {
 				parameters[path].push({
 					_id: $(v).attr('id'),
 					endpoint: $(this).val()
 				});
 			});
-			$("input:checkbox[name='" + path + "']").each(function(){
+			$("input:checkbox[name='" + path + "']").each(() => {
 				$(this).prop("disabled", true);
 			});
 			bundleData.parameters = parameters;
@@ -319,9 +319,7 @@
 			$("#bundleTemplates").html("");
 			$("#bundleInstances").html("");
 
-			let bundle = bundleTemplates.find(function(bundle) {
-				return bundle.id === event.srcElement.value;
-			});
+			const bundle = bundleTemplates.find(bundle => bundle.id === event.srcElement.value);
 			$("#bundleInstantiation").html("<b>Instantiating new bundle:</b><br/>" + bundle.name.en + "<br/><br/>");
 			$("#nameInputHolder").html("<br/>Bundle name <input type='text' id='nameInput' placeholder='name' value='" + bundle.name.en + "'>");
 			$("#continueButton").html("<br/><button value='" + event.srcElement.value + "' onclick='addBundle()'>Continue</button>");
@@ -351,10 +349,10 @@
 			}).then(bundleSaved => {
 				console.log("Bundle saved", bundleSaved);
 				return $.ajax({
-				url: baseUrl + '/api/v2/bundleInstances',
-				method: 'GET',
-				headers: {'Authorization': 'Bearer ' + token}
-			});
+					url: baseUrl + '/api/v2/bundleInstances',
+					method: 'GET',
+					headers: {'Authorization': 'Bearer ' + token}
+				});
 			}).then(instances => {
 				bundleInstances = instances;
 				returnToOverview();
@@ -383,7 +381,7 @@
 				url: baseUrl + '/api/v2/bundleTemplates',
 				method: 'GET',
 				headers: {'Authorization': 'Bearer ' + token},
-			}).then(function(templates) {
+			}).then(templates => {
 				bundleTemplates = templates;
 				displayBundleTemplates();
 			}).catch(handleError);
@@ -515,13 +513,13 @@
 				data: {
 					partnerAccessToken,
 				},
-			}).then(function(result) {
+			}).then(result => {
 				console.log('result', result);
 				if (result.token) {
 					token = result.token;
 					displayOverview();
 				}
-			}).catch(function(result) {
+			}).catch(result => {
 				console.log('Can not log in', result);
 				alert('Can not log in');
 			});
