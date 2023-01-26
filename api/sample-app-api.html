@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<title>Olisto - Bundle validation API example</title>
-		<meta name="description" content="An example for the Olisto SDK">
+		<meta name="description" content="An example for the Olisto API">
 
 		<script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
 	</head>
@@ -16,15 +16,17 @@
 		</style>
 
 		<h2>Sample app for bundle validation with APIs</h2>
-		<div>
-			<button onclick="loginGreenId()">Log in using OpenID</button>
-		</div>
+		<label for="loginProvider">Login provider</label>
+		<select name="loginProvider" id="loginProvider" value="facebook">
+			<option value="olisto">Olisto</option>
+			<option value="facebook">Facebook</option>
+			<option value="apple">Apple</option>
+			<option value="huawei">Huawei</option>
+		</select>
+		<button onclick="loginExternal()">Log in using oauth</button>
 		- or -
-		<div>
-			<input id="partnerId" type="text" placeholder="Partner ID" name="partnerId"/><br/>
-			<input id="partnerAccessToken" type="text" placeholder="Partner token" name="partnerAccessToken"/><br/>
-			<button onclick="loginPartnerToken()">Log in using token</button><br/>
-		</div>
+		<input id="partnerAccessToken" type="password" placeholder="Provider token" name="partnerAccessToken"/><nbsp/>
+		<button onclick="loginPartnerToken()">Log in using provider token</button><br/>
 
 		<div id="bundleTemplates"></div>
 		<div id="bundleInstances"></div>
@@ -48,7 +50,7 @@
 	</body>
 
 	<script>
-		var baseUrl = 'https://connect-green.olisto.com';
+		var baseUrl = 'https://connect.olisto.com';
 		let token;
 		let bundleTemplates = [];
 		let selectedBundle;
@@ -471,38 +473,46 @@
 			console.log(JSON.stringify(error));
 		}
 
-		function loginGreenId() {
-			var sessionId = Number(('' + Math.random()).split('.').pop()).toString(36);
-			window.open(baseUrl + '/api/v1/users/green/auth?session=' + sessionId, '_blank');
-			var intervalHandle = setInterval(function() {
-				$.ajax({
-					url: baseUrl + '/api/v1/users/green/loginSession/' + sessionId + '?response_type=bearer',
-					method: 'GET',
-				}).then(function(result) {
-					if (result.token) {
-						token = result.token;
-						clearInterval(intervalHandle);
-						displayOverview();
-					}
-				}).catch(function(result) {
-					//404 is expected while in progress. Anything else is a real error
-					if (result.status !== 404) {
-						clearInterval(intervalHandle);
-						throw new Error('Cannot log in');
-					}
-				});
-
-			}, 1000);
+		function loginExternal() {
+			const provider = $("#loginProvider").val();
+			$.ajax({
+				url: `${baseUrl}/api/v1/users/external/${provider}/getAuthUrl`,
+				method: 'GET',
+			}).then((authUrlResult) => {
+				if (!(authUrlResult.url && authUrlResult.requestId)) {
+					throw new Error("Error getting login info");
+				}
+				window.open(authUrlResult.url);
+				const intervalHandle = setInterval(() => {
+					$.ajax({
+						url: `${baseUrl}/api/v1/users/external/${provider}/loginSession/${authUrlResult.requestId}?response_type=bearer`,
+						method: 'GET',
+					}).then(result => {
+						if (result.token) {
+							token = result.token;
+							clearInterval(intervalHandle);
+							displayOverview();
+						}
+					}).catch(result => {
+						//404 is expected while in progress. Anything else is a real error
+						if (result.status !== 404) {
+							clearInterval(intervalHandle);
+							throw new Error('Cannot log in');
+						}
+					});
+				}, 1000);
+			}).catch(e => {
+				console.error(e.message, e);
+			});
 		}
 
 		function loginPartnerToken() {
-			var partnerAccessToken = document.getElementById('partnerAccessToken').value;
-			var partnerId = document.getElementById('partnerId').value;
+			const provider = $("#loginProvider").val();
+			const partnerAccessToken = $("#partnerAccessToken").val();
 			$.ajax({
-				url: baseUrl + '/api/v1/users/green/session?response_type=bearer',
+				url: `${baseUrl}/api/v1/users/external/${provider}/session?response_type=bearer`,
 				method: 'POST',
 				data: {
-					partnerId,
 					partnerAccessToken,
 				},
 			}).then(function(result) {
